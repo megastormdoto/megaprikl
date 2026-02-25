@@ -1,0 +1,4 @@
+fn main() {
+    bool b = !;  // ! with nothing after
+    return 0;
+}

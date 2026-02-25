@@ -1,0 +1,12 @@
+1:1 KW_FN "fn"
+1:4 IDENTIFIER "main"
+1:8 LPAREN "("
+1:9 RPAREN ")"
+1:11 LBRACE "{"
+2:5 IDENTIFIER "string"
+2:12 IDENTIFIER "s"
+2:14 ASSIGN "="
+4:16 UNKNOWN ""Hello;  // missing closing quote
+    return 0;
+}"
+4:2 END_OF_FILE ""

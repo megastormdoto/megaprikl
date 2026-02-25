@@ -1,0 +1,4 @@
+fn main() {
+    int this_identifier_is_way_too_long_and_exceeds_the_maximum_length_of_255_characters_but_we_need_to_test_this_edge_case_so_lets_add_more_characters_until_we_reach_256_and_see_what_happens_because_the_spec_says_max_255_so_this_should_be_invalid_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 42;
+    return 0;
+}

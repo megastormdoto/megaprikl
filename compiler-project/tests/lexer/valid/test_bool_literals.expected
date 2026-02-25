@@ -1,0 +1,50 @@
+1:1 KW_FN "fn"
+1:4 IDENTIFIER "main"
+1:8 LPAREN "("
+1:9 RPAREN ")"
+1:11 LBRACE "{"
+2:5 KW_BOOL "bool"
+2:10 IDENTIFIER "t"
+2:12 ASSIGN "="
+2:14 KW_TRUE "true" True
+2:18 SEMICOLON ";"
+3:5 KW_BOOL "bool"
+3:10 IDENTIFIER "f"
+3:12 ASSIGN "="
+3:14 KW_FALSE "false" False
+3:19 SEMICOLON ";"
+4:5 KW_IF "if"
+4:8 LPAREN "("
+4:9 KW_TRUE "true" True
+4:13 RPAREN ")"
+4:15 LBRACE "{"
+5:9 KW_RETURN "return"
+5:16 INT_LITERAL "1" 1
+5:17 SEMICOLON ";"
+6:5 RBRACE "}"
+7:5 KW_IF "if"
+7:8 LPAREN "("
+7:9 KW_FALSE "false" False
+7:14 RPAREN ")"
+7:16 LBRACE "{"
+8:9 KW_RETURN "return"
+8:16 INT_LITERAL "0" 0
+8:17 SEMICOLON ";"
+9:5 RBRACE "}"
+10:5 KW_BOOL "bool"
+10:10 IDENTIFIER "result"
+10:17 ASSIGN "="
+10:19 LPAREN "("
+10:20 KW_TRUE "true" True
+10:25 AND "&&"
+10:28 KW_FALSE "false" False
+10:33 RPAREN ")"
+10:35 OR "||"
+10:38 LPAREN "("
+10:39 KW_TRUE "true" True
+10:44 OR "||"
+10:47 KW_FALSE "false" False
+10:52 RPAREN ")"
+10:53 SEMICOLON ";"
+11:1 RBRACE "}"
+11:2 END_OF_FILE ""

@@ -1,0 +1,4 @@
+fn main() {
+    int x = 42@100;  // @ is invalid
+    return x;
+}

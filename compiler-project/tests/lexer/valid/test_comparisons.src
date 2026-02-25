@@ -1,0 +1,11 @@
+fn main() {
+    bool a = 5 == 5;
+    bool b = 5 != 6;
+    bool c = 5 < 6;
+    bool d = 5 <= 5;
+    bool e = 6 > 5;
+    bool f = 6 >= 6;
+    bool g = (5 < 6) && (6 > 5);
+    bool h = (5 > 6) || (6 > 5);
+    return 0;
+}

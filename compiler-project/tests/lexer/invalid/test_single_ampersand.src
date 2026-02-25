@@ -1,0 +1,4 @@
+fn main() {
+    bool b = (x & y);  // & without second &
+    return 0;
+}

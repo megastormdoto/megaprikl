@@ -1,0 +1,5 @@
+fn main() {
+    int x = 2147483648;  // too big (max is 2147483647)
+    int y = -2147483649; // too small (min is -2147483648)
+    return 0;
+}

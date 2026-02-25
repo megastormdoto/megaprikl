@@ -1,0 +1,9 @@
+fn main() {
+    int x = (1 + 2) * 3;
+    int arr[5] = {1, 2, 3, 4, 5};
+    if (x > 0) {
+        return arr[0];
+    } else {
+        return 0;
+    }
+}

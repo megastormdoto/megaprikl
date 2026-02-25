@@ -1,0 +1,14 @@
+int a = 5 + 3;
+int b = 10 - 4;
+int c = 6 * 7;
+int d = 20 / 5;
+int e = 17 % 5;
+int f = 1 + 2 * 3 - 4 / 2;
+bool g = a == b;
+bool h = a != b;
+bool i = a < b;
+bool j = a <= b;
+bool k = a > b;
+bool l = a >= b;
+bool m = (a < b) && (c > d);
+bool n = (a > b) || (c < d);

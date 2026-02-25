@@ -1,0 +1,11 @@
+// Single line comment
+fn main() {
+    // Another comment
+    int x = 42; // inline comment
+    /* multi-line
+       comment */
+    int y = /* inline */ 100;
+    /* nested /* comment */ test */
+    return x + y;
+}
+// Last comment

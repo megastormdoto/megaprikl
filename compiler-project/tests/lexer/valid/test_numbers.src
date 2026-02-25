@@ -1,0 +1,9 @@
+int a = 0;
+int b = 42;
+int c = 2147483647;  // max int
+int d = -2147483648; // min int
+float e = 3.14;
+float f = 0.5;
+float g = 10.0;
+float h = .75;
+float i = 123.456;

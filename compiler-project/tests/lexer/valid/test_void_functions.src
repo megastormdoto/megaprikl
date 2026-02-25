@@ -1,0 +1,8 @@
+fn print_hello() {
+    // do nothing
+}
+
+fn main() {
+    print_hello();
+    return 0;
+}

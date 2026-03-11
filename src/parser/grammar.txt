@@ -1,0 +1,82 @@
+* Grammar for MiniCompiler
+* EBNF Notation
+
+Program        ::= { Declaration }
+
+Declaration    ::= FunctionDecl | StructDecl | VarDecl
+
+FunctionDecl   ::= "fn" Identifier "(" [ Parameters ] ")" Type Block   # без стрелки!
+
+StructDecl     ::= "struct" Identifier "{" { VarDecl } "}"
+
+VarDecl        ::= Type Identifier [ "=" Expression ] ";"
+
+Parameters     ::= Parameter { "," Parameter }
+
+Parameter      ::= Type Identifier
+
+Statement      ::= Block
+                 | IfStmt
+                 | WhileStmt
+                 | ForStmt
+                 | ReturnStmt
+                 | ExprStmt
+                 | VarDecl
+
+Block          ::= "{" { Statement } "}"
+
+IfStmt         ::= "if" "(" Expression ")" Statement [ "else" Statement ]
+
+WhileStmt      ::= "while" "(" Expression ")" Statement
+
+ForStmt        ::= "for" "(" [ ExprStmt ] ";" [ Expression ] ";" [ Expression ] ")" Statement
+
+ReturnStmt     ::= "return" [ Expression ] ";"
+
+ExprStmt       ::= Expression ";"
+
+Expression     ::= Assignment
+
+Assignment     ::= LogicalOr { ("=" | "+=" | "-=" | "*=" | "/=") Assignment }
+
+LogicalOr      ::= LogicalAnd { "||" LogicalAnd }
+
+LogicalAnd     ::= Equality { "&&" Equality }
+
+Equality       ::= Relational { ("==" | "!=") Relational }
+
+Relational     ::= Additive { ("<" | "<=" | ">" | ">=") Additive }
+
+Additive       ::= Multiplicative { ("+" | "-") Multiplicative }
+
+Multiplicative ::= Unary { ("*" | "/" | "%") Unary }
+
+Unary          ::= ("-" | "!") Unary | Primary
+
+Primary        ::= Literal
+                 | Identifier
+                 | "(" Expression ")"
+                 | Call
+
+Call           ::= Identifier "(" [ Arguments ] ")"
+
+Arguments      ::= Expression { "," Expression }
+
+Type           ::= "int" | "float" | "bool" | "void" | Identifier
+
+Literal        ::= Integer | Float | String | "true" | "false"
+
+* Operator Precedence (highest to lowest):
+* 1. Primary: literals, identifiers, parenthesized expressions, calls
+* 2. Unary: - !
+* 3. Multiplicative: * / %
+* 4. Additive: + -
+* 5. Relational: < <= > >=
+* 6. Equality: == !=
+* 7. Logical AND: &&
+* 8. Logical OR: ||
+* 9. Assignment: = += -= *= /=
+
+* Associativity:
+* - Left-associative: + - * / % && || == != < <= > >=
+* - Right-associative: = += -= *= /=

@@ -1,0 +1,7 @@
+// examples/hello.src
+fn main() void {
+    int x = 42;
+    int y = 10;
+    int z = x + y;
+    return z;
+}

@@ -1,0 +1,28 @@
+digraph AST {
+  node [shape=box, style=filled, fillcolor=lightblue];
+  node0 [label="program"];
+  node1 [label="function_decl\nmain\nreturn: void"];
+  node2 [label="block"];
+  node3 [label="var_decl\nx\ntype: int"];
+  node4 [label="literal\n42\n(int)"];
+  node3 -> node4 [label="init"];
+  node2 -> node3 [label="0"];
+  node5 [label="var_decl\ny\ntype: int"];
+  node6 [label="literal\n10\n(int)"];
+  node5 -> node6 [label="init"];
+  node2 -> node5 [label="1"];
+  node7 [label="var_decl\nz\ntype: int"];
+  node8 [label="binary_expr\nop: +"];
+  node9 [label="identifier\nx"];
+  node8 -> node9 [label="left"];
+  node10 [label="identifier\ny"];
+  node8 -> node10 [label="right"];
+  node7 -> node8 [label="init"];
+  node2 -> node7 [label="2"];
+  node11 [label="return_stmt\nidentifier [6:12]"];
+  node12 [label="identifier\nz"];
+  node11 -> node12 [label="return"];
+  node2 -> node11 [label="3"];
+  node1 -> node2 [label="body"];
+  node0 -> node1;
+}

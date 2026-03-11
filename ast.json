@@ -1,0 +1,85 @@
+{
+  "type": "program",
+  "line": 2,
+  "column": 1,
+  "declarations": [
+    {
+      "type": "function_decl",
+      "line": 2,
+      "column": 1,
+      "name": "main",
+      "return_type": "void",
+      "body": {
+        "type": "block",
+        "line": 2,
+        "column": 16,
+        "statements": [
+          {
+            "type": "var_decl",
+            "line": 3,
+            "column": 5,
+            "name": "x",
+            "var_type": "int",
+            "initializer": {
+              "type": "literal",
+              "line": 3,
+              "column": 13,
+              "value": 42,
+              "literal_type": "int"
+            }
+          },
+          {
+            "type": "var_decl",
+            "line": 4,
+            "column": 5,
+            "name": "y",
+            "var_type": "int",
+            "initializer": {
+              "type": "literal",
+              "line": 4,
+              "column": 13,
+              "value": 10,
+              "literal_type": "int"
+            }
+          },
+          {
+            "type": "var_decl",
+            "line": 5,
+            "column": 5,
+            "name": "z",
+            "var_type": "int",
+            "initializer": {
+              "type": "binary_expr",
+              "line": 5,
+              "column": 13,
+              "operator": "+",
+              "left": {
+                "type": "identifier",
+                "line": 5,
+                "column": 13,
+                "name": "x"
+              },
+              "right": {
+                "type": "identifier",
+                "line": 5,
+                "column": 17,
+                "name": "y"
+              }
+            }
+          },
+          {
+            "type": "return_stmt",
+            "line": 6,
+            "column": 5,
+            "value": {
+              "type": "identifier",
+              "line": 6,
+              "column": 12,
+              "name": "z"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

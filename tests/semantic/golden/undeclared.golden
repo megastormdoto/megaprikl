@@ -1,0 +1,14 @@
+=== SYMBOL TABLE ===
+
+Global (scope 0):
+  - main: function -> int (line 1)
+
+=== ERRORS ===
+semantic error: undeclared identifier 'y'
+  --> line 3, column 12
+  = note: variable 'y' was not declared in this scope
+
+semantic error: return type mismatch in 'main'
+  --> line 3, column 5
+  = expected: int
+  = found: void

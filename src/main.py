@@ -9,6 +9,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.lexer.scanner import Scanner
 from src.parser.parser import Parser
 from src.parser.ast_printer import ASTPrinter
+from src.semantic.analyzer import SemanticAnalyzer
+from src.semantic.ast_decorator import DecoratedASTPrinter
 
 
 def read_file(filename):
@@ -35,6 +37,10 @@ def ast_to_json(node):
         'line': node.line,
         'column': node.column
     }
+
+    # Добавляем семантическую информацию если есть
+    if hasattr(node, 'semantic_type') and node.semantic_type:
+        result['semantic_type'] = str(node.semantic_type)
 
     # Добавляем общие поля
     if hasattr(node, 'name') and node.name:
@@ -168,6 +174,10 @@ def ast_to_dot(node, node_id=0, lines=None):
     if hasattr(node, 'literal_type') and node.literal_type:
         label += f"\\n({node.literal_type})"
 
+    # Добавляем семантический тип если есть
+    if hasattr(node, 'semantic_type') and node.semantic_type:
+        label += f"\\n[{node.semantic_type}]"
+
     lines.append(f'  node{node_id} [label="{label}"];')
     current_id = node_id + 1
 
@@ -293,12 +303,17 @@ def ast_to_dot(node, node_id=0, lines=None):
 
 def main():
     # Создаем парсер аргументов
-    parser = argparse.ArgumentParser(description='MiniCompiler - Парсер языка')
+    parser = argparse.ArgumentParser(description='MiniCompiler - Компилятор языка')
     parser.add_argument('--input', '-i', required=True, help='Входной файл с исходным кодом')
     parser.add_argument('--format', '-f', choices=['text', 'dot', 'json'],
                         default='text', help='Формат вывода AST (по умолчанию: text)')
     parser.add_argument('--output', '-o', help='Выходной файл (если не указан, вывод в консоль)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Показывать токены')
+
+    # Новые аргументы для семантического анализа
+    parser.add_argument('--check', action='store_true', help='Запустить семантическую проверку')
+    parser.add_argument('--symbols', action='store_true', help='Показать таблицу символов')
+    parser.add_argument('--decorated-ast', action='store_true', help='Показать AST с аннотациями типов')
 
     args = parser.parse_args()
 
@@ -315,16 +330,53 @@ def main():
             print(f"  {token}")
 
     # Синтаксический анализ
-    parser = Parser(tokens)
-    ast = parser.parse()
+    parser_obj = Parser(tokens)
+    ast = parser_obj.parse()
 
-    if parser.errors:
+    if parser_obj.errors:
         print("\nОшибки парсера:")
-        for error in parser.errors:
+        for error in parser_obj.errors:
             print(f"  {error}")
         sys.exit(1)
 
-    # Вывод AST в нужном формате
+    # Семантический анализ
+    semantic_analyzer = SemanticAnalyzer()
+    semantic_success = semantic_analyzer.analyze(ast)
+
+    # Если нужен только чек (без вывода AST)
+    if args.check:
+        print("\n=== СЕМАНТИЧЕСКАЯ ПРОВЕРКА ===")
+        if semantic_success:
+            print("УСПЕХ: Семантических ошибок не найдено")
+        else:
+            print(f"НЕУДАЧА: Найдено {len(semantic_analyzer.get_errors())} семантических ошибок")
+            for error in semantic_analyzer.get_errors():
+                print(f"\n{error}")
+        return
+
+    # Если нужна таблица символов
+    if args.symbols:
+        print("\n=== ТАБЛИЦА СИМВОЛОВ ===")
+        print(semantic_analyzer.get_symbol_table().dump())
+        return
+
+    # Если нужен декорированный AST
+    if args.decorated_ast:
+        print("\n=== ДЕКОРИРОВАННОЕ AST ДЕРЕВО (с типами) ===")
+        decorator = DecoratedASTPrinter()
+        output = decorator.print(ast)
+        print(output)
+
+        print("\n=== ТАБЛИЦА СИМВОЛОВ ===")
+        print(semantic_analyzer.get_symbol_table().dump())
+
+        if not semantic_success:
+            print("\n=== СЕМАНТИЧЕСКИЕ ОШИБКИ ===")
+            for error in semantic_analyzer.get_errors():
+                print(f"\n{error}")
+        return
+
+    # Вывод AST в нужном формате (обычный режим)
     if args.format == 'text':
         print("\nAST дерево:")
         printer = ASTPrinter()
@@ -345,6 +397,14 @@ def main():
         print(f"\nРезультат сохранен в {args.output}")
     else:
         print(output)
+
+    # Показываем информацию о семантике даже в обычном режиме
+    if args.verbose:
+        print("\n=== ИНФОРМАЦИЯ О СЕМАНТИКЕ ===")
+        if semantic_success:
+            print("Семантическая проверка: УСПЕШНО")
+        else:
+            print(f"Семантическая проверка: НАЙДЕНО ОШИБОК ({len(semantic_analyzer.get_errors())})")
 
 
 if __name__ == "__main__":

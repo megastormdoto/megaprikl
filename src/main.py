@@ -301,6 +301,75 @@ def ast_to_dot(node, node_id=0, lines=None):
     return current_id, lines
 
 
+def generate_ir(ast, symbol_table, output_file=None, output_format='text'):
+    """Generate IR from AST and output in specified format."""
+    from src.ir.ir_generator import IRGenerator
+    from src.ir.basic_block import ControlFlowGraph
+
+    ir_gen = IRGenerator(symbol_table)
+    ir_functions = ir_gen.generate(ast)
+
+    if output_format == 'text':
+        output = ir_gen.get_ir_text()
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(output)
+            print(f"\nIR сохранен в {output_file}")
+        else:
+            print("\n=== GENERATED IR ===")
+            print(output)
+    elif output_format == 'dot':
+        # Generate CFG in DOT format for each function
+        all_dot = []
+        for func_name, ir_func in ir_functions.items():
+            cfg = ControlFlowGraph()
+            for block in ir_func.blocks:
+                cfg.add_block(block)
+                for succ in block.successors:
+                    if succ not in cfg.all_blocks:
+                        cfg.all_blocks.append(succ)
+            if ir_func.entry_block:
+                cfg.set_entry(ir_func.entry_block)
+            all_dot.append(f"// Function: {func_name}\n" + cfg.dump_dot())
+        output = "\n\n".join(all_dot)
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(output)
+            print(f"\nCFG DOT сохранен в {output_file}")
+        else:
+            print("\n=== CONTROL FLOW GRAPH (DOT) ===")
+            print(output)
+    elif output_format == 'json':
+        # Convert IR to JSON
+        ir_data = {}
+        for func_name, ir_func in ir_functions.items():
+            blocks_data = []
+            for block in ir_func.blocks:
+                block_data = {
+                    'label': str(block.label) if block.label else None,
+                    'instructions': [str(instr) for instr in block.instructions],
+                    'successors': [str(s.label) for s in block.successors if s.label],
+                    'predecessors': [str(p.label) for p in block.predecessors if p.label],
+                    'type': block.block_type.value
+                }
+                blocks_data.append(block_data)
+            ir_data[func_name] = {
+                'return_type': ir_func.return_type,
+                'parameters': ir_func.parameters,
+                'blocks': blocks_data
+            }
+        output = json.dumps(ir_data, indent=2, ensure_ascii=False)
+        if output_file:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(output)
+            print(f"\nIR JSON сохранен в {output_file}")
+        else:
+            print("\n=== GENERATED IR (JSON) ===")
+            print(output)
+
+    return ir_functions
+
+
 def main():
     # Создаем парсер аргументов
     parser = argparse.ArgumentParser(description='MiniCompiler - Компилятор языка')
@@ -310,10 +379,16 @@ def main():
     parser.add_argument('--output', '-o', help='Выходной файл (если не указан, вывод в консоль)')
     parser.add_argument('--verbose', '-v', action='store_true', help='Показывать токены')
 
-    # Новые аргументы для семантического анализа
+    # Аргументы для семантического анализа
     parser.add_argument('--check', action='store_true', help='Запустить семантическую проверку')
     parser.add_argument('--symbols', action='store_true', help='Показать таблицу символов')
     parser.add_argument('--decorated-ast', action='store_true', help='Показать AST с аннотациями типов')
+
+    # Аргументы для генерации IR (Спринт 4)
+    parser.add_argument('--ir', action='store_true', help='Сгенерировать Intermediate Representation (IR)')
+    parser.add_argument('--ir-format', choices=['text', 'dot', 'json'], default='text',
+                        help='Формат вывода IR (по умолчанию: text)')
+    parser.add_argument('--ir-output', '-io', help='Файл для сохранения IR')
 
     args = parser.parse_args()
 
@@ -342,6 +417,19 @@ def main():
     # Семантический анализ
     semantic_analyzer = SemanticAnalyzer()
     semantic_success = semantic_analyzer.analyze(ast)
+
+    # Если нужна генерация IR (приоритет выше остальных режимов)
+    if args.ir:
+        if not semantic_success:
+            print("\nОШИБКА: Невозможно сгенерировать IR из-за семантических ошибок")
+            for error in semantic_analyzer.get_errors():
+                print(f"  {error}")
+            sys.exit(1)
+
+        print("\n=== ГЕНЕРАЦИЯ IR ===")
+        generate_ir(ast, semantic_analyzer.get_symbol_table(),
+                    output_file=args.ir_output, output_format=args.ir_format)
+        return
 
     # Если нужен только чек (без вывода AST)
     if args.check:

@@ -1,0 +1,12 @@
+fn main() int {
+    int x = 5;
+    int result = 0;
+    
+    if (x > 0) {
+        result = 10;
+    } else {
+        result = 20;
+    }
+    
+    return result;
+}

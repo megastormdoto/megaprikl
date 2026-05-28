@@ -1,0 +1,30 @@
+Get-Content test_asm.src #1
+
+python -c "
+import sys
+sys.path.insert(0, '.')
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+from src.semantic.analyzer import SemanticAnalyzer
+from src.ir.ir_generator import IRGenerator
+from src.codegen.x86_generator import X86Generator
+
+source = open('test_asm.src', 'r', encoding='utf-8').read()
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+analyzer = SemanticAnalyzer()
+analyzer.analyze(ast)
+ir_gen = IRGenerator(analyzer.get_symbol_table())
+ir_funcs = ir_gen.generate(ast)
+x86_gen = X86Generator()
+asm = x86_gen.generate(ir_funcs)
+print(asm)
+" > test_output.asm
+
+Get-Content test_output.asm #2
+
+Get-ChildItem src\codegen\ #3
+
+Get-Content src\runtime\runtime.asm #4

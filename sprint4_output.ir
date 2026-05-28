@@ -1,0 +1,19 @@
+# Generated IR
+#==================================================
+
+function main: int ()
+
+L0:
+    STORE [t0], 10
+    t1 = LOAD [t0]
+    t2 = CMP_GT t1, 5  # t1 > 5
+    JUMP_IF t2, L1
+    JUMP L2
+
+L1:
+    RETURN 1
+
+L2:
+    RETURN 0
+
+L3:

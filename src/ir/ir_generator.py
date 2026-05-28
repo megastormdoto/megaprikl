@@ -1,4 +1,4 @@
-﻿"""IR Generator - traverses decorated AST and produces Intermediate Representation."""
+"""IR Generator - traverses decorated AST and produces Intermediate Representation."""
 
 from typing import Dict, List, Optional, Any
 from src.parser.ast import (
@@ -191,7 +191,14 @@ class IRGenerator:
             return self.current_function.new_temp("int")
 
     def _generate_binary_op(self, node: BinaryExprNode) -> Operand:
-        """Generate IR for binary operation."""
+        """Generate IR for binary operation with short-circuit for logical ops."""
+        # Special handling for logical operators with short-circuit
+        if node.operator == '&&':
+            return self._generate_logical_and(node)
+        elif node.operator == '||':
+            return self._generate_logical_or(node)
+        
+        # For arithmetic and comparison operators, generate both sides
         left_temp = self._generate_expression(node.left)
         right_temp = self._generate_expression(node.right)
 
@@ -207,8 +214,6 @@ class IRGenerator:
             '<=': OpCode.CMP_LE,
             '>': OpCode.CMP_GT,
             '>=': OpCode.CMP_GE,
-            '&&': OpCode.AND,
-            '||': OpCode.OR,
         }
 
         opcode = op_map.get(node.operator, OpCode.ADD)
@@ -224,6 +229,132 @@ class IRGenerator:
         self.current_block.add_instruction(instr)
 
         return result_temp
+
+    def _generate_logical_and(self, node: BinaryExprNode) -> Operand:
+        """Generate short-circuit AND."""
+        result = self.current_function.new_temp("bool")
+        
+        # Labels for short-circuit
+        false_label = self.current_function.new_label()
+        end_label = self.current_function.new_label()
+        
+        # Evaluate left operand
+        left_val = self._generate_expression(node.left)
+        
+        # If left is false, jump to false label
+        jump_if_false = IRInstruction(
+            op=OpCode.JUMP_IF_NOT,
+            dest=left_val,
+            src1=false_label
+        )
+        self.current_block.add_instruction(jump_if_false)
+        
+        # Evaluate right operand (only if left is true)
+        right_val = self._generate_expression(node.right)
+        
+        # If right is false, jump to false label
+        jump_if_false2 = IRInstruction(
+            op=OpCode.JUMP_IF_NOT,
+            dest=right_val,
+            src1=false_label
+        )
+        self.current_block.add_instruction(jump_if_false2)
+        
+        # Result is true
+        store_true = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(1, "bool")
+        )
+        self.current_block.add_instruction(store_true)
+        
+        jump_to_end = IRInstruction(
+            op=OpCode.JUMP,
+            src1=end_label
+        )
+        self.current_block.add_instruction(jump_to_end)
+        
+        # False block
+        false_block = BasicBlock(label=false_label)
+        self.current_function.blocks.append(false_block)
+        self.current_block = false_block
+        
+        store_false = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(0, "bool")
+        )
+        self.current_block.add_instruction(store_false)
+        
+        # End block
+        end_block = BasicBlock(label=end_label)
+        self.current_function.blocks.append(end_block)
+        self.current_block = end_block
+        
+        return result
+
+    def _generate_logical_or(self, node: BinaryExprNode) -> Operand:
+        """Generate short-circuit OR."""
+        result = self.current_function.new_temp("bool")
+        
+        # Labels for short-circuit
+        true_label = self.current_function.new_label()
+        end_label = self.current_function.new_label()
+        
+        # Evaluate left operand
+        left_val = self._generate_expression(node.left)
+        
+        # If left is true, jump to true label
+        jump_if_true = IRInstruction(
+            op=OpCode.JUMP_IF,
+            dest=left_val,
+            src1=true_label
+        )
+        self.current_block.add_instruction(jump_if_true)
+        
+        # Evaluate right operand (only if left is false)
+        right_val = self._generate_expression(node.right)
+        
+        # If right is true, jump to true label
+        jump_if_true2 = IRInstruction(
+            op=OpCode.JUMP_IF,
+            dest=right_val,
+            src1=true_label
+        )
+        self.current_block.add_instruction(jump_if_true2)
+        
+        # Result is false
+        store_false = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(0, "bool")
+        )
+        self.current_block.add_instruction(store_false)
+        
+        jump_to_end = IRInstruction(
+            op=OpCode.JUMP,
+            src1=end_label
+        )
+        self.current_block.add_instruction(jump_to_end)
+        
+        # True block
+        true_block = BasicBlock(label=true_label)
+        self.current_function.blocks.append(true_block)
+        self.current_block = true_block
+        
+        store_true = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(1, "bool")
+        )
+        self.current_block.add_instruction(store_true)
+        
+        # End block
+        end_block = BasicBlock(label=end_label)
+        self.current_function.blocks.append(end_block)
+        self.current_block = end_block
+        
+        return result
 
     def _generate_unary_op(self, node: UnaryExprNode) -> Operand:
         """Generate IR for unary operation."""

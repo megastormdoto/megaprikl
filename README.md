@@ -1,6 +1,7 @@
- MiniCompiler
+```markdown
+# MiniCompiler
 
-Лёгкая реализация компилятора для языка, похожего на C, с поддержкой лексического, синтаксического и семантического анализа (построение AST, проверка типов, таблица символов), генерацией промежуточного представления (IR), обработки ошибок и набором тестов.
+Лёгкая реализация компилятора для языка, похожего на C, с поддержкой лексического, синтаксического и семантического анализа (построение AST, проверка типов, таблица символов), генерацией промежуточного представления (IR), генерацией x86-64 ассемблерного кода, обработки ошибок и набором тестов.
 
 ## Команда
 
@@ -46,6 +47,16 @@
 - Вывод IR в трёх форматах: текст для чтения, JSON для машинной обработки, DOT для визуализации
 - Набор юнит-тестов для проверки корректности генерации IR
 
+### Спринт 5 (Генерация x86-64 ассемблерного кода)
+- Трансляция IR в ассемблерный код x86-64 (синтаксис NASM)
+- Поддержка System V AMD64 ABI (стековый кадр, регистры, передача параметров)
+- Правильные пролог и эпилог функций: `push rbp`, `mov rbp, rsp`, `sub rsp, N`, `mov rsp, rbp`, `pop rbp`, `ret`
+- Управление стековым кадром для локальных переменных и временных значений
+- Базовый аллокатор регистров с выбрасыванием на стек
+- Генерация инструкций: `mov`, `add`, `sub`, `imul`, `idiv`, `cmp`, `jmp`, `jnz`, `call`, `ret`
+- Runtime библиотека на ассемблере с функциями `print_int`, `print_string`, `exit`, `_start`
+- Полный пайплайн: исходный код → IR → ассемблер → исполняемый файл (через NASM и LD)
+
 ## Спецификация языка
 
 Полная спецификация языка доступна в файле [`docs/language_spec.md`](docs/language_spec.md) и включает:
@@ -65,29 +76,37 @@
 ```
 compiler-project/
 ├── src/
-│   ├── lexer/
+│   ├── lexer/                  # Sprint 1
 │   │   ├── __init__.py
 │   │   ├── token.py
 │   │   ├── scanner.py
 │   │   └── errors.py
-│   ├── parser/
+│   ├── parser/                 # Sprint 2
 │   │   ├── __init__.py
 │   │   ├── ast.py
 │   │   ├── parser.py
 │   │   ├── ast_printer.py
 │   │   └── grammar.txt
-│   ├── semantic/
+│   ├── semantic/               # Sprint 3
 │   │   ├── __init__.py
 │   │   ├── analyzer.py
 │   │   ├── symbol_table.py
 │   │   ├── type_system.py
 │   │   ├── ast_decorator.py
 │   │   └── errors.py
-│   ├── ir/
+│   ├── ir/                     # Sprint 4
 │   │   ├── __init__.py
 │   │   ├── ir_instructions.py
 │   │   ├── basic_block.py
 │   │   └── ir_generator.py
+│   ├── codegen/                # Sprint 5
+│   │   ├── __init__.py
+│   │   ├── abi.py              # System V ABI константы
+│   │   ├── stack_frame.py      # Управление стековым кадром
+│   │   ├── register_allocator.py # Аллокатор регистров
+│   │   └── x86_generator.py    # Генератор ассемблера x86-64
+│   ├── runtime/                # Sprint 5
+│   │   └── runtime.asm         # Runtime библиотека (NASM)
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   └── helpers.py
@@ -111,9 +130,7 @@ compiler-project/
 │   └── factorial.src
 ├── docs/
 │   └── language_spec.md
-├── test_ir_arithmetic.py
-├── test_ir_if.py
-├── test_ir_while.py
+├── sprint4_delivery/           # Демо-пакет Sprint 4
 ├── README.md
 ├── pyproject.toml
 └── setup.py
@@ -125,6 +142,8 @@ compiler-project/
 
 - Python 3.8 или выше
 - pip (менеджер пакетов Python)
+- NASM (для сборки ассемблера)
+- LD (линковщик, входит в binutils)
 
 ### Установка
 
@@ -149,11 +168,11 @@ source venv/bin/activate
 pip install -e .
 ```
 
-**Windows:**
+**Windows (WSL рекомендуется для codegen):**
 ```bash
-python -m venv venv
-venv\Scripts\activate
-pip install -e .
+# Для генерации ассемблера лучше использовать WSL
+wsl
+cd /mnt/c/Users/user/PycharmProjects/compiler-project
 ```
 
 ## Быстрый старт
@@ -197,111 +216,86 @@ python src/main.py --input examples/correct.src --decorated-ast
 
 ```bash
 # Генерация IR в консоль
-python src/main.py --input examples/factorial.src --ir
+python src/main.py --input test_asm.src --ir
 
 # Сохранение IR в файл
-python src/main.py --input examples/factorial.src --ir --ir-output factorial.ir
+python src/main.py --input test_asm.src --ir --ir-output test.ir
 
 # Генерация IR в JSON формате
-python src/main.py --input examples/factorial.src --ir --ir-format json
+python src/main.py --input test_asm.src --ir --ir-format json
+```
 
-# Генерация CFG в формате DOT для визуализации
-python src/main.py --input examples/factorial.src --ir --ir-format dot --ir-output cfg.dot
+### Генерация x86-64 ассемблерного кода — Sprint 5
 
-# Конвертация DOT в PNG (требуется Graphviz)
-dot -Tpng cfg.dot -o cfg.png
+```bash
+# Полный пайплайн: исходник → IR → ассемблер
+python -c "
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+from src.semantic.analyzer import SemanticAnalyzer
+from src.ir.ir_generator import IRGenerator
+from src.codegen.x86_generator import X86Generator
+
+source = open('test_asm.src', 'r', encoding='utf-8').read()
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+analyzer = SemanticAnalyzer()
+analyzer.analyze(ast)
+ir_gen = IRGenerator(analyzer.get_symbol_table())
+ir_funcs = ir_gen.generate(ast)
+x86_gen = X86Generator()
+print(x86_gen.generate(ir_funcs))
+" > output.asm
+
+# Сборка исполняемого файла
+nasm -f elf64 output.asm -o output.o
+ld -o output_program output.o
+
+# Запуск
+./output_program
+echo $?  # выводит код возврата (результат программы)
 ```
 
 ### Пример исходного файла
 
-Создайте файл `examples/correct.src`:
+Создайте файл `test_asm.src`:
 
 ```
 fn main() int {
-    int x = 5;
-    int y = 10;
-    return x + y;
+    int x = 2 * 3 + 4;
+    return x;
 }
 ```
 
-### Пример вывода AST (текстовый формат)
+### Пример сгенерированного ассемблера (Sprint 5)
 
-```
-Program [2:1]:
-  FunctionDecl: main -> void [2:1]
-    Parameters:
-    Body:
-      Block [2:16]:
-        VarDecl: int counter = ... [3:5]
-          Literal: 42 (int) [3:18]
-        Return [4:5]:
-          Identifier: counter [4:12]
-```
+```asm
+; Generated by MiniCompiler
+section .text
+global main
 
-### Пример вывода декорированного AST (с типами)
+main:
+    push rbp
+    mov rbp, rsp
+    sub rsp, 8
 
-```
-Program [line 1:1]
-  FunctionDecl: main [line 1:1]
-    Body:
-      Block [line 1:15]
-        VarDecl: x: int [line 2:5]
-          = Literal: 5 [int] [line 2:13]
-        VarDecl: y: int [line 3:5]
-          = Literal: 10 [int] [line 3:13]
-        ReturnStmt [int] [line 4:5]
-          BinaryOp: + [int] [line 4:12]
-```
+    mov eax, 2
+    imul eax, 3
+    add eax, 4
+    mov [rbp-8], eax
+    mov eax, [rbp-8]
 
-### Пример вывода таблицы символов
+    mov rsp, rbp
+    pop rbp
+    ret
 
-```
-Global (scope 0):
-  - main: function -> int (line 1)
-```
-
-### Пример вывода семантической ошибки
-
-```
-semantic error: return type mismatch in 'main'
-  --> line 6, column 5
-  = expected: void
-  = found: int
-```
-
-### Пример генерации IR (Sprint 4)
-
-**Входной код (`examples/if_example.src`):**
-```
-fn main() int {
-    int x = 10;
-    if (x > 5) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-```
-
-**Сгенерированный IR:**
-```
-# Generated IR
-#==================================================
-
-function main: int ()
-
-L0:
-    STORE [t0], 10
-    t1 = LOAD [t0]
-    t2 = CMP_GT t1, 5
-    JUMP_IF t2, L1
-    JUMP L2
-
-L1:
-    RETURN 1
-
-L2:
-    RETURN 0
+_start:
+    call main
+    mov rdi, rax
+    mov rax, 60
+    syscall
 ```
 
 ## Тестирование
@@ -325,75 +319,50 @@ python test_ir_while.py
 
 # С использованием pytest
 pytest tests/ -v
-
-# С отчётом о покрытии
-pytest tests/ --cov=src --cov-report=term
 ```
 
 ### Набор тестов
 
-**Тесты лексера:**
-- Корректные тесты (20+): отдельные типы токенов, граничные случаи, комментарии
-- Некорректные тесты (10+): недопустимые символы, незавершённые строки
+**Тесты лексера, парсера, семантики, IR** — описаны в предыдущих спринтах.
 
-**Тесты парсера:**
-- Выражения, операторы, объявления, полные программы
-- Синтаксические ошибки
-
-**Тесты семантического анализа:**
-- Проверка типов, областей видимости, обработка ошибок
-- Golden-тестирование
-
-**Тесты генерации IR (Sprint 4):**
-- Арифметические выражения (MUL, ADD, RETURN)
-- Условные операторы (CMP_GT, JUMP_IF)
-- Циклы while (CMP_LT, JUMP_IF)
+**Тесты codegen (Sprint 5):**
+- Проверка генерации пролога/эпилога
+- Проверка арифметических инструкций
+- Проверка работы со стеком
+- ABI compliance (регистры, выравнивание)
 
 ## Грамматика языка (EBNF)
 
-Формальная грамматика описана в файле [`src/parser/grammar.txt`](src/parser/grammar.txt). Основные правила:
-
-```
-Program        ::= { Declaration }
-FunctionDecl   ::= "fn" Identifier "(" [ Parameters ] ")" Type Block
-VarDecl        ::= Type Identifier [ "=" Expression ] ";"
-Statement      ::= Block | IfStmt | WhileStmt | ForStmt | ReturnStmt | ExprStmt | VarDecl
-Expression     ::= Assignment
-Assignment     ::= LogicalOr { "=" LogicalOr }
-LogicalOr      ::= LogicalAnd { "||" LogicalAnd }
-LogicalAnd     ::= Equality { "&&" Equality }
-Equality       ::= Relational { ("==" | "!=") Relational }
-Relational     ::= Additive { ("<" | "<=" | ">" | ">=") Additive }
-Additive       ::= Multiplicative { ("+" | "-") Multiplicative }
-Multiplicative ::= Unary { ("*" | "/" | "%") Unary }
-Unary          ::= [ "-" | "!" ] Primary
-Primary        ::= Literal | Identifier | "(" Expression ")" | Call
-```
+Формальная грамматика описана в файле [`src/parser/grammar.txt`](src/parser/grammar.txt).
 
 ## Детали реализации
 
 ### Компоненты лексера
-- **token.py**: Определения токенов и перечислений
-- **scanner.py**: Основная реализация сканера
-- **errors.py**: Обработка ошибок лексера
+- **token.py**: Определения токенов
+- **scanner.py**: Сканер с отслеживанием позиции
+- **errors.py**: Обработка ошибок
 
 ### Компоненты парсера
 - **ast.py**: Классы узлов AST
 - **parser.py**: Рекурсивный парсер
 - **ast_printer.py**: Вывод AST
-- **grammar.txt**: Грамматика в нотации EBNF
 
 ### Компоненты семантического анализатора
-- **symbol_table.py**: Иерархическая таблица символов
+- **symbol_table.py**: Таблица символов
 - **type_system.py**: Система типов
 - **analyzer.py**: Обход AST с проверками
-- **ast_decorator.py**: Вывод AST с типами
-- **errors.py**: Сбор семантических ошибок
 
 ### Компоненты генератора IR (Sprint 4)
-- **ir_instructions.py**: Инструкции и операнды IR (OpCode, Operand, IRInstruction)
-- **basic_block.py**: Базовые блоки и контрольный граф потока (BasicBlock, ControlFlowGraph)
-- **ir_generator.py**: Генератор IR, обходящий декорированное AST
+- **ir_instructions.py**: Инструкции и операнды IR
+- **basic_block.py**: Базовые блоки и CFG
+- **ir_generator.py**: Генерация IR из AST
+
+### Компоненты codegen (Sprint 5)
+- **abi.py**: Константы System V AMD64 ABI
+- **stack_frame.py**: Управление стековым кадром
+- **register_allocator.py**: Аллокатор регистров
+- **x86_generator.py**: Генерация ассемблера x86-64
+- **runtime.asm**: Runtime библиотека (NASM)
 
 ### Ключевые особенности
 - Точное отслеживание позиции (строка/столбец)
@@ -404,10 +373,13 @@ Primary        ::= Literal | Identifier | "(" Expression ")" | Call
 - Проверка типов с неявным расширением
 - Трёхадресный код с виртуальными регистрами
 - Визуализация CFG в формате DOT
+- **Новое:** Генерация ассемблера x86-64 с соблюдением ABI
+- **Новое:** Runtime библиотека для вывода и ввода
 
 ### Производительность
 - Лексер: O(n)
 - Парсер: O(n) для LL(1) грамматики
-- Семантический анализ: O(n) однократный обход AST
-- Генерация IR: O(n) однократный обход декорированного AST
-- Память: пропорционально размеру AST, таблице символов и IR
+- Семантический анализ: O(n)
+- Генерация IR: O(n)
+- Генерация ассемблера: O(n) с одним проходом
+- Память: пропорционально размеру AST, таблице символов, IR и ассемблеру

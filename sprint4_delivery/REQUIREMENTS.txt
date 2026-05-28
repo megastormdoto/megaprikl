@@ -1,0 +1,27 @@
+﻿============================================
+SPRINT 4 - IR GENERATION DELIVERY
+============================================
+
+ФАЙЛЫ (10 тестов):
+
+=== VALID TESTS (6) ===
+- test_arithmetic.src   - арифметика (MUL, ADD, RETURN)
+- test_if.src           - if/else (CMP_GT, JUMP_IF)
+- test_while.src        - while (CMP_LT, JUMP_IF)
+- test_nested_if.src    - вложенный if (CMP_GT, JUMP_IF)
+- test_comparisons.src  - сравнения (CMP_EQ, CMP_NE, CMP_LT, CMP_LE, CMP_GT, CMP_GE)
+- test_assignments.src  - присваивания (STORE)
+
+=== INVALID TESTS (4) ===
+- invalid_undeclared.src     - ошибка: undeclared identifier
+- invalid_type_mismatch.src  - ошибка: type mismatch
+- invalid_if_non_bool.src    - ошибка: condition must be boolean
+- invalid_duplicate_var.src  - ошибка: duplicate variable
+
+ЗАПУСК ВСЕХ ТЕСТОВ:
+  .\run_all_tests.bat
+
+ЗАПУСК ОТДЕЛЬНОГО ТЕСТА (из корня проекта):
+  python src/main.py --input sprint4_delivery/test_arithmetic.src --ir
+
+============================================

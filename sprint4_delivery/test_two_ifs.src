@@ -1,0 +1,10 @@
+fn main() int {
+    int x = 10;
+    if (x > 10) {
+        return 100;
+    }
+    if (x == 10) {
+        return 200;
+    }
+    return 300;
+}

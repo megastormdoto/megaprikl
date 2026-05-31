@@ -113,6 +113,11 @@ class Scanner:
                 self._add_token(TokenType.OR)
             else:
                 self._error("Expected '||'")
+        elif c == '.':
+            if self._match('.') and self._match('.'):
+                self._add_token(TokenType.ELLIPSIS)
+            else:
+                self._add_token(TokenType.DOT)
         elif c == '(':
             self._add_token(TokenType.LPAREN)
         elif c == ')':

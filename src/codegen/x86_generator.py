@@ -13,7 +13,8 @@ class X86Generator:
         self.current_function: Optional[IRFunction] = None
         self.var_locations = {}
         self.next_offset = 8
-        self.label_counter = 0  # Для уникальных меток в сравнениях
+        self.label_counter = 0
+        self.temp_counter = 0  # Для временных переменных
 
     def generate(self, ir_functions: Dict[str, IRFunction]) -> str:
         output = []
@@ -32,6 +33,7 @@ class X86Generator:
         self.current_function = func
         self.var_locations = {}
         self.next_offset = 8
+        self.temp_counter = 0
 
         # Allocate stack slots for variables
         self._allocate_slots(func)
@@ -45,14 +47,17 @@ class X86Generator:
 
         for block in func.blocks:
             if block.label:
-                lines.append(f"{str(block.label).replace(':', '')}:")
+                # Убираем двоеточие и точки из меток
+                label_str = str(block.label).replace(':', '').replace('.', '_')
+                lines.append(f"{label_str}:")
             for instr in block.instructions:
                 asm = self._generate_instruction(instr)
                 if asm:
                     for line in asm.split('\n'):
-                        lines.append(f"    {line}")
+                        if line.strip():
+                            lines.append(f"    {line}")
 
-        lines.append(".epilogue:")
+        lines.append("_epilogue:")
         lines.append("    mov rsp, rbp")
         lines.append("    pop rbp")
         lines.append("    ret")
@@ -98,7 +103,6 @@ class X86Generator:
             return self._gen_return(instr)
         elif op == OpCode.CALL:
             return self._gen_call(instr)
-        # NEW: Comparison operations
         elif op == OpCode.CMP_EQ:
             return self._gen_compare(instr, "je")
         elif op == OpCode.CMP_NE:
@@ -111,7 +115,6 @@ class X86Generator:
             return self._gen_compare(instr, "jg")
         elif op == OpCode.CMP_GE:
             return self._gen_compare(instr, "jge")
-        # NEW: Logical operations with short-circuit
         elif op == OpCode.AND:
             return self._gen_logical_and(instr)
         elif op == OpCode.OR:
@@ -126,15 +129,23 @@ class X86Generator:
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
 
-        # If src1 is literal, mov it to eax first
+        lines = []
+
+        # Загружаем первый операнд в eax
         if instr.src1.type == OperandType.LITERAL:
-            lines = [f"mov eax, {src1_asm}"]
+            lines.append(f"mov eax, {src1_asm}")
+        elif instr.src1.type == OperandType.VARIABLE:
+            lines.append(f"mov eax, {src1_asm}")
+        elif instr.src1.type == OperandType.TEMP:
+            lines.append(f"mov eax, {src1_asm}")
+
+        # Выполняем операцию
+        if instr.src2.type == OperandType.LITERAL:
+            lines.append(f"{asm_op} eax, {src2_asm}")
         else:
-            lines = [f"mov eax, {src1_asm}"]
+            lines.append(f"{asm_op} eax, {src2_asm}")
 
-        lines.append(f"{asm_op} eax, {src2_asm}")
-
-        # Store result if destination is a variable
+        # Сохраняем результат
         if instr.dest and instr.dest.type == OperandType.VARIABLE:
             dest_asm = self._to_asm(instr.dest)
             lines.append(f"mov {dest_asm}, eax")
@@ -165,49 +176,71 @@ class X86Generator:
 
     def _gen_store(self, instr: IRInstruction) -> str:
         dest_asm = self._to_asm(instr.dest)
-        src_asm = self._to_asm(instr.src1)
 
         if instr.src1.type == OperandType.LITERAL:
+            src_asm = self._to_asm(instr.src1)
             return f"mov {dest_asm}, {src_asm}"
         else:
-            return f"mov eax, {src_asm}\n    mov {dest_asm}, eax"
+            src_asm = self._to_asm(instr.src1)
+            # Избегаем mov eax, eax
+            if src_asm != "eax":
+                return f"mov eax, {src_asm}\n    mov {dest_asm}, eax"
+            else:
+                return f"mov {dest_asm}, eax"
 
     def _gen_load(self, instr: IRInstruction) -> str:
         src_asm = self._to_asm(instr.src1)
         dest_asm = self._to_asm(instr.dest)
-        return f"mov eax, {src_asm}\n    mov {dest_asm}, eax"
+
+        # Избегаем mov eax, eax
+        if src_asm != "eax":
+            return f"mov eax, {src_asm}\n    mov {dest_asm}, eax"
+        else:
+            return f"mov {dest_asm}, eax"
 
     def _gen_jump_if(self, instr: IRInstruction) -> str:
         """Conditional jump if condition is true (non-zero)."""
         cond_asm = self._to_asm(instr.dest)
-        label = instr.src1
+        label = str(instr.src1).replace('.', '_')
         return f"cmp {cond_asm}, 0\n    jne {label}"
 
     def _gen_jump_if_not(self, instr: IRInstruction) -> str:
         """Conditional jump if condition is false (zero)."""
         cond_asm = self._to_asm(instr.dest)
-        label = instr.src1
+        label = str(instr.src1).replace('.', '_')
         return f"cmp {cond_asm}, 0\n    je {label}"
 
     def _gen_return(self, instr: IRInstruction) -> str:
         if instr.dest:
             dest_asm = self._to_asm(instr.dest)
-            return f"mov eax, {dest_asm}\n    jmp .epilogue"
-        return "jmp .epilogue"
+            return f"mov eax, {dest_asm}\n    jmp _epilogue"
+        return "jmp _epilogue"
 
     def _gen_call(self, instr: IRInstruction) -> str:
         func_name = str(instr.src1)
-        return f"call {func_name}"
 
+        # External calls (printf, malloc, free)
+        if func_name in ["printf", "malloc", "free", "scanf"]:
+            # System V AMD64 ABI:
+            # rdi, rsi, rdx, rcx, r8, r9 - integer/pointer args
+            # al = number of vector registers (0 for integer only)
+            lines = []
+            lines.append(f"; call {func_name}")
+            lines.append("    xor eax, eax    ; al = 0 (no vector registers)")
+
+            # For printf, args are already in registers from PARAM instructions
+            # We need to load them according to ABI
+            # This is simplified - real implementation would collect args from PARAMs
+            lines.append(f"    call {func_name}")
+            return "\n    ".join(lines)
+
+        return f"call {func_name}"
     def _gen_compare(self, instr: IRInstruction, jump_inst: str) -> str:
-        """
-        Generate comparison instruction.
-        Sets AL to 1 if condition true, 0 otherwise.
-        """
+        """Generate comparison instruction."""
         self.label_counter += 1
         counter = self.label_counter
-        true_label = f".Lcmp_true_{counter}"
-        end_label = f".Lcmp_end_{counter}"
+        true_label = f"_cmp_true_{counter}"
+        end_label = f"_cmp_end_{counter}"
 
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
@@ -223,7 +256,6 @@ class X86Generator:
             f"{end_label}:",
         ]
 
-        # Store result if destination is a variable
         if instr.dest and instr.dest.type == OperandType.VARIABLE:
             dest_asm = self._to_asm(instr.dest)
             lines.append(f"mov {dest_asm}, al")
@@ -231,14 +263,11 @@ class X86Generator:
         return "\n    ".join(lines)
 
     def _gen_logical_and(self, instr: IRInstruction) -> str:
-        """
-        Generate logical AND with short-circuit evaluation.
-        If left operand is false, right operand is not evaluated.
-        """
+        """Generate logical AND with short-circuit evaluation."""
         self.label_counter += 1
         counter = self.label_counter
-        false_label = f".Land_false_{counter}"
-        end_label = f".Land_end_{counter}"
+        false_label = f"_land_false_{counter}"
+        end_label = f"_land_end_{counter}"
 
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
@@ -257,7 +286,6 @@ class X86Generator:
             f"{end_label}:",
         ]
 
-        # Store result if destination is a variable
         if instr.dest and instr.dest.type == OperandType.VARIABLE:
             dest_asm = self._to_asm(instr.dest)
             lines.append(f"mov {dest_asm}, al")
@@ -265,14 +293,11 @@ class X86Generator:
         return "\n    ".join(lines)
 
     def _gen_logical_or(self, instr: IRInstruction) -> str:
-        """
-        Generate logical OR with short-circuit evaluation.
-        If left operand is true, right operand is not evaluated.
-        """
+        """Generate logical OR with short-circuit evaluation."""
         self.label_counter += 1
         counter = self.label_counter
-        true_label = f".Lor_true_{counter}"
-        end_label = f".Lor_end_{counter}"
+        true_label = f"_lor_true_{counter}"
+        end_label = f"_lor_end_{counter}"
 
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
@@ -291,7 +316,6 @@ class X86Generator:
             f"{end_label}:",
         ]
 
-        # Store result if destination is a variable
         if instr.dest and instr.dest.type == OperandType.VARIABLE:
             dest_asm = self._to_asm(instr.dest)
             lines.append(f"mov {dest_asm}, al")
@@ -304,10 +328,9 @@ class X86Generator:
 
         lines = [
             f"mov al, {src_asm}",
-            f"xor al, 1",  # Flip lowest bit (0->1, 1->0)
+            f"xor al, 1",
         ]
 
-        # Store result if destination is a variable
         if instr.dest and instr.dest.type == OperandType.VARIABLE:
             dest_asm = self._to_asm(instr.dest)
             lines.append(f"mov {dest_asm}, al")
@@ -320,7 +343,6 @@ class X86Generator:
             return "0"
 
         if op.type == OperandType.LITERAL:
-            # Handle boolean literals
             if isinstance(op.value, bool):
                 return "1" if op.value else "0"
             return str(op.value)
@@ -328,11 +350,9 @@ class X86Generator:
             offset = self.var_locations.get(op.value, 8)
             return f"[rbp-{offset}]"
         elif op.type == OperandType.TEMP:
-            # For temporaries, load from stack if needed
-            # For now, assume value is in eax/al
             return "eax"
         elif op.type == OperandType.LABEL:
-            return str(op).replace(':', '')
+            return str(op).replace(':', '').replace('.', '_')
 
         return "0"
 

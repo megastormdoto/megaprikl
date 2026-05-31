@@ -5,7 +5,6 @@ from typing import List, Optional, Any
 
 
 class NodeType(Enum):
-    """Типы узлов AST"""
     PROGRAM = "program"
     FUNCTION_DECL = "function_decl"
     VAR_DECL = "var_decl"
@@ -23,11 +22,12 @@ class NodeType(Enum):
     IDENTIFIER = "identifier"
     CALL = "call"
     ASSIGNMENT = "assignment"
+    ARRAY_DECL = "array_decl"
+    ARRAY_ACCESS = "array_access"
 
 
 @dataclass
 class ASTNode:
-    """Базовый класс для всех узлов AST"""
     node_type: NodeType
     line: int
     column: int
@@ -38,7 +38,6 @@ class ASTNode:
 
 @dataclass
 class ProgramNode(ASTNode):
-    """Корневой узел программы"""
     declarations: List[ASTNode] = field(default_factory=list)
 
     def __init__(self, declarations=None, line=0, column=0):
@@ -48,7 +47,6 @@ class ProgramNode(ASTNode):
 
 @dataclass
 class FunctionDeclNode(ASTNode):
-    """Объявление функции"""
     name: str
     return_type: str
     parameters: List['ParameterNode']
@@ -64,7 +62,6 @@ class FunctionDeclNode(ASTNode):
 
 @dataclass
 class ParameterNode(ASTNode):
-    """Параметр функции"""
     name: str
     param_type: str
 
@@ -76,7 +73,6 @@ class ParameterNode(ASTNode):
 
 @dataclass
 class VarDeclNode(ASTNode):
-    """Объявление переменной"""
     var_type: str
     name: str
     initializer: Optional[ASTNode] = None
@@ -89,8 +85,31 @@ class VarDeclNode(ASTNode):
 
 
 @dataclass
+class ArrayDeclNode(ASTNode):
+    element_type: str
+    name: str
+    size: ASTNode
+
+    def __init__(self, element_type, name, size, line, column):
+        super().__init__(NodeType.ARRAY_DECL, line, column)
+        self.element_type = element_type
+        self.name = name
+        self.size = size
+
+
+@dataclass
+class ArrayAccessNode(ASTNode):
+    array: str
+    index: ASTNode
+
+    def __init__(self, array, index, line, column):
+        super().__init__(NodeType.ARRAY_ACCESS, line, column)
+        self.array = array
+        self.index = index
+
+
+@dataclass
 class StructDeclNode(ASTNode):
-    """Объявление структуры"""
     name: str
     fields: List[VarDeclNode]
 
@@ -102,7 +121,6 @@ class StructDeclNode(ASTNode):
 
 @dataclass
 class BlockNode(ASTNode):
-    """Блок операторов в {}"""
     statements: List[ASTNode]
 
     def __init__(self, statements, line, column):
@@ -112,7 +130,6 @@ class BlockNode(ASTNode):
 
 @dataclass
 class IfStmtNode(ASTNode):
-    """Условный оператор"""
     condition: ASTNode
     then_branch: ASTNode
     else_branch: Optional[ASTNode] = None
@@ -126,7 +143,6 @@ class IfStmtNode(ASTNode):
 
 @dataclass
 class WhileStmtNode(ASTNode):
-    """Цикл while"""
     condition: ASTNode
     body: ASTNode
 
@@ -138,7 +154,6 @@ class WhileStmtNode(ASTNode):
 
 @dataclass
 class ForStmtNode(ASTNode):
-    """Цикл for"""
     init: Optional[ASTNode]
     condition: Optional[ASTNode]
     update: Optional[ASTNode]
@@ -154,7 +169,6 @@ class ForStmtNode(ASTNode):
 
 @dataclass
 class ReturnStmtNode(ASTNode):
-    """Оператор return"""
     value: Optional[ASTNode] = None
 
     def __init__(self, value=None, line=0, column=0):
@@ -164,7 +178,6 @@ class ReturnStmtNode(ASTNode):
 
 @dataclass
 class ExprStmtNode(ASTNode):
-    """Выражение как оператор"""
     expression: ASTNode
 
     def __init__(self, expression, line, column):
@@ -174,7 +187,6 @@ class ExprStmtNode(ASTNode):
 
 @dataclass
 class BinaryExprNode(ASTNode):
-    """Бинарное выражение (a + b, a * b и т.д.)"""
     left: ASTNode
     operator: str
     right: ASTNode
@@ -188,7 +200,6 @@ class BinaryExprNode(ASTNode):
 
 @dataclass
 class UnaryExprNode(ASTNode):
-    """Унарное выражение (-a, !b)"""
     operator: str
     operand: ASTNode
 
@@ -200,9 +211,8 @@ class UnaryExprNode(ASTNode):
 
 @dataclass
 class LiteralNode(ASTNode):
-    """Литерал (число, строка, булево значение)"""
     value: Any
-    literal_type: str  # "int", "float", "bool", "string"
+    literal_type: str
 
     def __init__(self, value, literal_type, line, column):
         super().__init__(NodeType.LITERAL, line, column)
@@ -212,7 +222,6 @@ class LiteralNode(ASTNode):
 
 @dataclass
 class IdentifierNode(ASTNode):
-    """Идентификатор (имя переменной/функции)"""
     name: str
 
     def __init__(self, name, line, column):
@@ -222,7 +231,6 @@ class IdentifierNode(ASTNode):
 
 @dataclass
 class CallNode(ASTNode):
-    """Вызов функции"""
     callee: str
     arguments: List[ASTNode]
 
@@ -234,9 +242,8 @@ class CallNode(ASTNode):
 
 @dataclass
 class AssignmentNode(ASTNode):
-    """Присваивание (x = 5)"""
     target: str
-    operator: str  # "=", "+=", "-=" и т.д.
+    operator: str
     value: ASTNode
 
     def __init__(self, target, operator, value, line, column):
@@ -244,3 +251,26 @@ class AssignmentNode(ASTNode):
         self.target = target
         self.operator = operator
         self.value = value
+
+
+@dataclass
+class ArrayInitNode(ASTNode):
+    values: List[ASTNode]
+
+    def __init__(self, values, line, column):
+        super().__init__(NodeType.LITERAL, line, column)
+        self.values = values
+
+@dataclass
+class ArrayDeclNode(ASTNode):
+    element_type: str
+    name: str
+    size: ASTNode
+    initializer: Optional[List[ASTNode]] = None  # добавить это поле
+
+    def __init__(self, element_type, name, size, line, column, initializer=None):
+        super().__init__(NodeType.VAR_DECL, line, column)
+        self.element_type = element_type
+        self.name = name
+        self.size = size
+        self.initializer = initializer

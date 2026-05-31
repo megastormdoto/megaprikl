@@ -51,6 +51,8 @@ class TokenType(Enum):
     RBRACKET = auto()  # ]
     SEMICOLON = auto()  # ;
     COMMA = auto()  # ,
+    DOT = auto()  # .
+    ELLIPSIS = auto()  # ...
 
     # Special
     END_OF_FILE = auto()

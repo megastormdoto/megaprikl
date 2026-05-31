@@ -11,32 +11,29 @@ L0:
     mov eax, 0
     mov eax, 5
     mov eax, eax
-        mov eax, eax
     mov eax, eax
         cmp eax, 0
-        jne .Lcmp_true_1
+        jne _cmp_true_1
         mov al, 0
-        jmp .Lcmp_end_1
-        .Lcmp_true_1:
+        jmp _cmp_end_1
+        _cmp_true_1:
         mov al, 1
-        .Lcmp_end_1:
+        _cmp_end_1:
     cmp eax, 0
         je L1
     mov eax, eax
-        mov eax, eax
     mov eax, eax
-        mov eax, eax
     mov eax, eax
         cdq
         idiv eax
     mov eax, eax
         cmp eax, 2
-        jg .Lcmp_true_2
+        jg _cmp_true_2
         mov al, 0
-        jmp .Lcmp_end_2
-        .Lcmp_true_2:
+        jmp _cmp_end_2
+        _cmp_true_2:
         mov al, 1
-        .Lcmp_end_2:
+        _cmp_end_2:
     cmp eax, 0
         je L1
     mov eax, 1
@@ -49,12 +46,12 @@ L2:
     jmp L4
 L3:
     mov eax, 1
-        jmp .epilogue
+        jmp _epilogue
 L4:
     mov eax, 2
-        jmp .epilogue
+        jmp _epilogue
 L5:
-.epilogue:
+_epilogue:
     mov rsp, rbp
     pop rbp
     ret

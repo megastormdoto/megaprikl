@@ -134,6 +134,10 @@ class SemanticAnalyzer:
 
     def visit_function_decl(self, node: FunctionDeclNode):
         """Проверяет тело функции."""
+        # Пропускаем extern функции (у них нет тела)
+        if hasattr(node, 'is_extern') and node.is_extern:
+            return
+
         func_sym = self.symbol_table.lookup(node.name)
         if not func_sym:
             return

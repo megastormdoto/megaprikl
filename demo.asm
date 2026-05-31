@@ -3,12 +3,13 @@ section .text
 global main
 
 
-main:
+factorial:
     push rbp
     mov rbp, rsp
 
 L0:
-    mov eax, 42
+    ; TODO: param
+    mov eax, 0
         jmp _epilogue
 _epilogue:
     mov rsp, rbp

@@ -1,0 +1,14 @@
+int main() {
+    int x = 10 + 20;
+    int y = x * 2;
+    int z = 100;
+    
+    if (y > 50) {
+        return 1;
+    } else {
+        return 0;
+    }
+    
+    z = 999;  // dead code
+    return 2; // unreachable
+}

@@ -1,0 +1,9 @@
+extern void printf(char* fmt, ...);
+extern void* malloc(int size);
+extern void free(void* ptr);
+
+int main() {
+    int arr[5] = {1, 2, 3, 4, 5};
+    printf("arr[2] = %d\n", arr[2]);
+    return 0;
+}

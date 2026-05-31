@@ -1,8 +1,7 @@
-
 ```markdown
 # MiniCompiler
 
-Лёгкая реализация компилятора для языка, похожего на C, с поддержкой лексического, синтаксического и семантического анализа (построение AST, проверка типов, таблица символов), генерацией промежуточного представления (IR), генерацией x86-64 ассемблерного кода, обработки ошибок и набором тестов.
+Лёгкая реализация компилятора для языка, похожего на C, с поддержкой лексического, синтаксического и семантического анализа (построение AST, проверка типов, таблица символов), генерацией промежуточного представления (IR), генерацией x86-64 ассемблерного кода, системой оптимизаций и набором тестов.
 
 ## Команда
 
@@ -67,13 +66,43 @@
 - Правильная обработка вложенных управляющих конструкций
 - Демонстрационные примеры в папке `sprint6_demo/`
 
+### Спринт 7 (Массивы, внешние вызовы и оптимизации)
+- **Массивы:**
+  - Синтаксис объявления: `int arr[5]`
+  - Инициализация: `int arr[3] = {1, 2, 3}`
+  - Доступ к элементам: `arr[i]`
+  - Выделение памяти в куче через `malloc` (с поддержкой `free`)
+  - Проверка границ массива (bounds checking)
+  - Копирование массивов через `memcpy`
+
+- **Внешние вызовы (System V AMD64 ABI):**
+  - Объявление внешних функций: `extern int printf(char* fmt, ...)`
+  - Поддержка стандартной библиотеки C: `printf`, `scanf`, `malloc`, `free`, `memcpy`, `exit`
+  - Передача аргументов через регистры: `rdi`, `rsi`, `rdx`, `rcx`, `r8`, `r9`
+  - Проверка возврата `malloc` на `NULL` с выводом ошибки
+
+- **Оптимизации IR:**
+  - **Constant folding** — свёртка константных выражений: `10 + 20 → 30`
+  - **Constant propagation** — распространение констант по IR
+  - **Dead code elimination** — удаление недостижимого кода
+  - **Optimization pipeline** — цепочка последовательных оптимизаций
+
+- **Демонстрационная программа:**
+  - Рекурсивный факториал (`demo_factorial.src`)
+  - Алгоритм быстрой сортировки Quicksort с использованием массивов
+
+- **Тестирование:**
+  - Тесты для массивов (объявление, инициализация, доступ)
+  - Тесты для внешних вызовов
+  - Тесты для оптимизаций (constant folding, propagation, dead code elimination)
+
 ## Спецификация языка
 
 Полная спецификация языка доступна в файле [`docs/language_spec.md`](docs/language_spec.md) и включает:
 
 - Формальное EBNF-определение грамматики
 - Категории токенов с регулярными выражениями
-- Ключевые слова: `if`, `else`, `while`, `for`, `int`, `float`, `bool`, `return`, `true`, `false`, `void`, `struct`, `fn`
+- Ключевые слова: `if`, `else`, `while`, `for`, `int`, `float`, `bool`, `return`, `true`, `false`, `void`, `struct`, `extern`
 - Идентификаторы: буквы, цифры, подчёркивания (макс. 255 символов, регистрозависимые)
 - Литералы: целые числа, числа с плавающей точкой, строки, булевы значения
 - Операторы: арифметические (`+ - * / %`), реляционные (`== != < <= > >=`), логические (`&& || !`), присваивание (`=`)
@@ -108,8 +137,9 @@ compiler-project/
 │   │   ├── __init__.py
 │   │   ├── ir_instructions.py
 │   │   ├── basic_block.py
-│   │   └── ir_generator.py
-│   ├── codegen/                # Sprint 5-6
+│   │   ├── ir_generator.py
+│   │   └── optimizer.py       # Sprint 7: оптимизации IR
+│   ├── codegen/                # Sprint 5-7
 │   │   ├── __init__.py
 │   │   ├── abi.py              # System V ABI константы
 │   │   ├── stack_frame.py      # Управление стековым кадром
@@ -136,6 +166,7 @@ compiler-project/
 │   ├── control_flow/           # Sprint 6
 │   │   ├── valid/
 │   │   └── invalid/
+│   ├── test_sprint7.py         # Sprint 7: тесты массивов и оптимизаций
 │   └── test_runner.py
 ├── examples/
 │   ├── hello.src
@@ -145,6 +176,8 @@ compiler-project/
 │   ├── source.c
 │   ├── output.asm
 │   └── demo.bat
+├── demo_factorial.src          # Sprint 7: демо-программа (факториал)
+├── demo_quicksort.src          # Sprint 7: демо-программа (быстрая сортировка)
 ├── docs/
 │   └── language_spec.md
 ├── README.md
@@ -159,7 +192,7 @@ compiler-project/
 - Python 3.8 или выше
 - pip (менеджер пакетов Python)
 - NASM (для сборки ассемблера)
-- LD (линковщик, входит в binutils)
+- GCC (для линковки с библиотекой C)
 
 ### Установка
 
@@ -184,7 +217,7 @@ source venv/bin/activate
 pip install -e .
 ```
 
-**Windows (WSL рекомендуется для codegen):**
+**Windows (рекомендуется WSL):**
 ```bash
 # Для генерации ассемблера лучше использовать WSL
 wsl
@@ -241,7 +274,7 @@ python src/main.py --input test_asm.src --ir --ir-output test.ir
 python src/main.py --input test_asm.src --ir --ir-format json
 ```
 
-### Генерация x86-64 ассемблерного кода — Sprint 5-6
+### Генерация x86-64 ассемблерного кода — Sprint 5-7
 
 ```bash
 # Полный пайплайн: исходник → IR → ассемблер
@@ -267,63 +300,80 @@ print(x86_gen.generate(ir_funcs))
 
 # Сборка исполняемого файла
 nasm -f elf64 output.asm -o output.o
-ld -o output_program output.o
+gcc -no-pie output.o -o output_program
 
 # Запуск
 ./output_program
 echo $?  # выводит код возврата (результат программы)
 ```
 
-### Пример исходного файла
+### Пример исходного файла с массивами (Sprint 7)
 
-Создайте файл `test_asm.src`:
+Создайте файл `test_array.src`:
 
-```
-fn main() int {
-    int x = 2 * 3 + 4;
-    return x;
+```c
+extern void printf(char* fmt, ...);
+
+int main() {
+    int arr[5] = {1, 2, 3, 4, 5};
+    printf("arr[2] = %d\n", arr[2]);
+    return 0;
 }
 ```
 
-### Пример сгенерированного ассемблера для if-else с short-circuit (Sprint 6)
+### Пример сгенерированного ассемблера для массива (Sprint 7)
 
 **Исходный код:**
 ```c
-fn main() int {
-    int a = 0;
-    int b = 5;
-    
-    if (a != 0 && b / a > 2) {
+int main() {
+    int arr[5] = {1, 2, 3, 4, 5};
+    return arr[2];
+}
+```
+
+**Сгенерированный IR:**
+```
+function main: int ()
+L0:
+    t0 = MUL 5, 4          # размер массива в байтах
+    t1 = CALL malloc()     # выделение памяти в куче
+    STORE [t2], t1         # сохранение указателя
+    STORE [t3], 5          # сохранение размера
+    # инициализация элементов 0-4
+    t19 = LOAD [t2]
+    t20 = MUL 2, 4         # индекс 2 * 4
+    t21 = ADD t19, t20     # вычисление адреса arr[2]
+    t22 = LOAD [t21]       # загрузка значения
+    RETURN t22
+```
+
+**Особенности реализации:**
+- Массивы выделяются в куче через `malloc`
+- Добавлена проверка возврата `malloc` на `NULL`
+- Поддержка `free` для освобождения памяти
+- Проверка границ массива (опционально)
+
+### Пример с оптимизациями (Sprint 7)
+
+**Исходный код до оптимизаций:**
+```c
+int compute() {
+    int x = 10 + 20;        // константное выражение
+    int y = x * 2;          // использование константы
+    if (y > 50) {           // константное условие
         return 1;
     } else {
-        return 2;
+        return 0;           // недостижимый код
     }
 }
 ```
 
-**Сгенерированный ассемблер x86-64:**
-```asm
-main:
-    push rbp
-    mov rbp, rsp
-
-    mov eax, 0          ; a = 0
-    mov eax, 5          ; b = 5
-    cmp eax, 0          ; проверка a != 0
-    je L1               ; если a == 0, прыжок в else (short-circuit!)
-    ...
-    idiv eax            ; деление (выполняется только если a != 0)
-    cmp eax, 2
-    jg .Lcmp_true_2
-    ...
-L1:                     ; else-ветка
-    mov eax, 0
-    ...
-    mov eax, 2          ; return 2
-    jmp .epilogue
+**После оптимизаций (constant folding + propagation + dead code elimination):**
+```c
+int compute() {
+    return 1;               // весь код свёрнут в одну инструкцию
+}
 ```
-
-**Ключевая особенность:** Благодаря short-circuit evaluation, инструкция `idiv` не выполняется при `a == 0`, что предотвращает деление на ноль.
 
 ## Тестирование
 
@@ -347,26 +397,19 @@ python test_ir_while.py
 # Тесты управляющих конструкций (Sprint 6)
 python tests/control_flow/run_tests.py
 
+# Тесты Sprint 7 (массивы и оптимизации)
+python tests/test_sprint7.py
+
 # С использованием pytest
 pytest tests/ -v
 ```
 
-### Набор тестов
+### Набор тестов Sprint 7
 
-**Тесты лексера, парсера, семантики, IR** — описаны в предыдущих спринтах.
-
-**Тесты codegen (Sprint 5):**
-- Проверка генерации пролога/эпилога
-- Проверка арифметических инструкций
-- Проверка работы со стеком
-- ABI compliance (регистры, выравнивание)
-
-**Тесты управляющих конструкций (Sprint 6):**
-- If-else statement (true/false paths)
-- While and for loops
-- Nested conditionals
-- Short-circuit evaluation for && and ||
-- Mixed arithmetic and logical expressions
+- **TEST-1:** Объявление и инициализация массивов
+- **TEST-2:** Внешние вызовы (printf, malloc, free)
+- **TEST-3:** Constant folding и propagation
+- **TEST-4:** Dead code elimination и optimization pipeline
 
 ## Грамматика языка (EBNF)
 
@@ -394,12 +437,21 @@ pytest tests/ -v
 - **basic_block.py**: Базовые блоки и CFG
 - **ir_generator.py**: Генерация IR из AST
 
-### Компоненты codegen (Sprint 5-6)
+### Компоненты оптимизатора IR (Sprint 7)
+- **optimizer.py**: Проходы оптимизаций:
+  - Constant propagation
+  - Dead code elimination
+  - Optimization pipeline
+
+### Компоненты codegen (Sprint 5-7)
 - **abi.py**: Константы System V AMD64 ABI
 - **stack_frame.py**: Управление стековым кадром
 - **register_allocator.py**: Аллокатор регистров
-- **x86_generator.py**: Генератор ассемблера x86-64 (расширен для поддержки управляющих конструкций)
-- **runtime.asm**: Runtime библиотека (NASM)
+- **x86_generator.py**: Генератор ассемблера x86-64 с поддержкой:
+  - Управляющих конструкций (if/else, while, for)
+  - Short-circuit evaluation (&&, ||)
+  - Массивов (malloc, free, bounds checking)
+  - Внешних вызовов (printf, malloc, free, memcpy)
 
 ### Ключевые особенности
 - Точное отслеживание позиции (строка/столбец)
@@ -415,12 +467,16 @@ pytest tests/ -v
 - **Новое (Sprint 6):** Поддержка if/else, циклов while/for
 - **Новое (Sprint 6):** Short-circuit evaluation для && и ||
 - **Новое (Sprint 6):** Генерация условных переходов x86-64
+- **Новое (Sprint 7):** Поддержка массивов (синтаксис, выделение в куче, bounds checking)
+- **Новое (Sprint 7):** Внешние вызовы стандартной библиотеки C
+- **Новое (Sprint 7):** Оптимизации IR (constant folding, propagation, dead code elimination)
 
 ### Производительность
 - Лексер: O(n)
 - Парсер: O(n) для LL(1) грамматики
 - Семантический анализ: O(n)
 - Генерация IR: O(n)
+- Оптимизации IR: O(n) за проход
 - Генерация ассемблера: O(n) с одним проходом
 - Память: пропорционально размеру AST, таблице символов, IR и ассемблеру
 ```

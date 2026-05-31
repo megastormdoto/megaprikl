@@ -1,0 +1,116 @@
+## 1. Тесты Sprint 7
+```bash
+python3 tests/test_sprint7.py
+```
+
+## 2. Все тесты лексера
+```bash
+python3 tests/test_runner.py
+```
+
+## 3. Тесты парсера
+```bash
+python3 tests/parser/test_parser.py
+```
+
+## 4. Семантические тесты
+```bash
+python3 tests/semantic/run_tests.py
+```
+
+## 5. Показать демо-программу
+```bash
+cat demo_factorial.src
+```
+
+## 6. Скомпилировать и запустить factorial
+```bash
+python3 -c "
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+from src.semantic.analyzer import SemanticAnalyzer
+from src.ir.ir_generator import IRGenerator
+from src.codegen.x86_generator import X86Generator
+
+with open('demo_factorial.src', 'r') as f:
+    source = f.read()
+
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+analyzer = SemanticAnalyzer()
+analyzer.analyze(ast)
+ir_gen = IRGenerator(analyzer.get_symbol_table())
+ir_funcs = ir_gen.generate(ast)
+x86_gen = X86Generator()
+asm = x86_gen.generate(ir_funcs)
+
+with open('factorial.asm', 'w') as f:
+    f.write(asm)
+print('Assembly generated')
+
+import subprocess
+subprocess.run(['nasm', '-f', 'elf64', 'factorial.asm', '-o', 'factorial.o'])
+subprocess.run(['gcc', '-no-pie', 'factorial.o', '-o', 'factorial'])
+result = subprocess.run(['./factorial'], capture_output=True)
+print(f'Exit code: {result.returncode}')
+"
+```
+
+## 7. Генерация IR для массива
+```bash
+python3 -c "
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+from src.semantic.analyzer import SemanticAnalyzer
+from src.ir.ir_generator import IRGenerator
+
+source = 'int main() { int arr[5] = {1,2,3,4,5}; return arr[2]; }'
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+analyzer = SemanticAnalyzer()
+analyzer.analyze(ast)
+ir_gen = IRGenerator(analyzer.get_symbol_table())
+ir_funcs = ir_gen.generate(ast)
+print(ir_gen.get_ir_text())
+"
+```
+
+## 8. Показать код оптимизатора (первые 30 строк)
+```bash
+head -30 src/ir/optimizer.py
+```
+
+## 9. Показать проверку malloc в x86_generator
+```bash
+grep -A 12 'func_name == "malloc"' src/codegen/x86_generator.py
+```
+
+## 10. Показать весь x86_generator (первые 30 строк)
+```bash
+head -30 src/codegen/x86_generator.py
+```
+
+## 11. Показать AST для массива
+```bash
+python3 -c "
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+
+source = 'int main() { int arr[5] = {1,2,3,4,5}; return arr[2]; }'
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+print('AST parsed successfully')
+print(f'Declarations: {len(ast.declarations)}')
+"
+```
+
+## 12. Проверить версию Python
+```bash
+python3 --version
+```

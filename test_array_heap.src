@@ -1,0 +1,23 @@
+extern void printf(char* fmt, ...);
+extern void* malloc(int size);
+extern void free(void* ptr);
+
+int main() {
+    int arr[5];
+    int i;
+    
+    // ???????? ?????? ? ????
+    arr = malloc(5 * 4);
+    
+    // ??????????????
+    arr[0] = 1;
+    arr[1] = 2;
+    arr[2] = 3;
+    arr[3] = 4;
+    arr[4] = 5;
+    
+    printf("arr[2] = %d\n", arr[2]);
+    
+    free(arr);
+    return 0;
+}

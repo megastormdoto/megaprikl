@@ -36,9 +36,7 @@ class IRGenerator:
 
     def _generate_function(self, node: FunctionDeclNode) -> IRFunction:
         """Generate IR for a single function."""
-        # Проверка на extern функцию (нет тела)
         if node.body is None:
-            # Создаём пустую заглушку для extern функции
             ir_func = IRFunction(
                 name=node.name,
                 return_type=node.return_type,
@@ -68,25 +66,14 @@ class IRGenerator:
         ir_func.blocks.append(entry_block)
 
         # Map parameters to temporaries
-        param_index = 0
         for param_name, param_type in ir_func.parameters:
             temp = ir_func.new_temp(param_type)
             self.var_to_temp[param_name] = temp
-            # PARAM instruction to receive parameter
-            param_instr = IRInstruction(
-                op=OpCode.PARAM,
-                dest=temp,
-                src1=Operand.literal(param_index, "int"),
-                comment=f"param {param_name}"
-            )
-            self.current_block.add_instruction(param_instr)
-            param_index += 1
 
-        # Generate function body
         self._generate_block(node.body)
 
         # Add implicit return if needed
-        if self.current_block.instructions:
+        if self.current_block and self.current_block.instructions:
             last_instr = self.current_block.instructions[-1]
             if last_instr.op != OpCode.RETURN:
                 if node.return_type == "void":
@@ -105,11 +92,15 @@ class IRGenerator:
 
     def _generate_block(self, node: BlockNode):
         """Generate IR for a block statement."""
+        if node is None:
+            return
         for stmt in node.statements:
             self._generate_statement(stmt)
 
     def _generate_statement(self, node):
         """Dispatch to appropriate statement handler."""
+        if node is None:
+            return
         if isinstance(node, VarDeclNode):
             self._generate_var_decl(node)
         elif isinstance(node, AssignmentNode):
@@ -167,6 +158,8 @@ class IRGenerator:
 
     def _generate_expression(self, node) -> Operand:
         """Generate IR for expression and return result temp."""
+        if node is None:
+            return Operand.literal(0, "int")
         if isinstance(node, LiteralNode):
             return self._generate_literal(node)
         elif isinstance(node, IdentifierNode):
@@ -211,7 +204,6 @@ class IRGenerator:
 
     def _generate_binary_op(self, node: BinaryExprNode) -> Operand:
         """Generate IR for binary operation with constant folding and short-circuit."""
-        # Constant Folding - OPT-1
         from src.parser.ast import LiteralNode
 
         left_is_const = isinstance(node.left, LiteralNode)
@@ -238,19 +230,16 @@ class IRGenerator:
                         return None
                     result = left_val % right_val
                 else:
-                    # Not a constant-foldable operation
                     pass
                 return Operand.literal(result, "int")
             except:
                 pass
 
-        # Special handling for logical operators with short-circuit
         if node.operator == '&&':
             return self._generate_logical_and(node)
         elif node.operator == '||':
             return self._generate_logical_or(node)
 
-        # For arithmetic and comparison operators, generate both sides
         left_temp = self._generate_expression(node.left)
         right_temp = self._generate_expression(node.right)
 
@@ -286,14 +275,11 @@ class IRGenerator:
         """Generate short-circuit AND."""
         result = self.current_function.new_temp("bool")
 
-        # Labels for short-circuit
         false_label = self.current_function.new_label()
         end_label = self.current_function.new_label()
 
-        # Evaluate left operand
         left_val = self._generate_expression(node.left)
 
-        # If left is false, jump to false label
         jump_if_false = IRInstruction(
             op=OpCode.JUMP_IF_NOT,
             dest=left_val,
@@ -301,10 +287,8 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_false)
 
-        # Evaluate right operand (only if left is true)
         right_val = self._generate_expression(node.right)
 
-        # If right is false, jump to false label
         jump_if_false2 = IRInstruction(
             op=OpCode.JUMP_IF_NOT,
             dest=right_val,
@@ -312,7 +296,6 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_false2)
 
-        # Result is true
         store_true = IRInstruction(
             op=OpCode.STORE,
             dest=result,
@@ -326,7 +309,6 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_to_end)
 
-        # False block
         false_block = BasicBlock(label=false_label)
         self.current_function.blocks.append(false_block)
         self.current_block = false_block
@@ -338,7 +320,6 @@ class IRGenerator:
         )
         self.current_block.add_instruction(store_false)
 
-        # End block
         end_block = BasicBlock(label=end_label)
         self.current_function.blocks.append(end_block)
         self.current_block = end_block
@@ -349,14 +330,11 @@ class IRGenerator:
         """Generate short-circuit OR."""
         result = self.current_function.new_temp("bool")
 
-        # Labels for short-circuit
         true_label = self.current_function.new_label()
         end_label = self.current_function.new_label()
 
-        # Evaluate left operand
         left_val = self._generate_expression(node.left)
 
-        # If left is true, jump to true label
         jump_if_true = IRInstruction(
             op=OpCode.JUMP_IF,
             dest=left_val,
@@ -364,10 +342,8 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_true)
 
-        # Evaluate right operand (only if left is false)
         right_val = self._generate_expression(node.right)
 
-        # If right is true, jump to true label
         jump_if_true2 = IRInstruction(
             op=OpCode.JUMP_IF,
             dest=right_val,
@@ -375,7 +351,6 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_true2)
 
-        # Result is false
         store_false = IRInstruction(
             op=OpCode.STORE,
             dest=result,
@@ -389,7 +364,6 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_to_end)
 
-        # True block
         true_block = BasicBlock(label=true_label)
         self.current_function.blocks.append(true_block)
         self.current_block = true_block
@@ -401,7 +375,6 @@ class IRGenerator:
         )
         self.current_block.add_instruction(store_true)
 
-        # End block
         end_block = BasicBlock(label=end_label)
         self.current_function.blocks.append(end_block)
         self.current_block = end_block
@@ -453,6 +426,7 @@ class IRGenerator:
         else_label = self.current_function.new_label()
         merge_label = self.current_function.new_label()
 
+        # Jump to then if condition true
         jump_if_instr = IRInstruction(
             op=OpCode.JUMP_IF,
             dest=cond_temp,
@@ -461,39 +435,33 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_instr)
 
+        # Jump to else
         jump_to_else = IRInstruction(
             op=OpCode.JUMP,
             src1=else_label
         )
         self.current_block.add_instruction(jump_to_else)
 
+        # Then block
         then_block = BasicBlock(label=then_label)
         self.current_function.blocks.append(then_block)
         self.current_block = then_block
-
         self._generate_statement(node.then_branch)
-
         if not self.current_block.is_terminated():
-            jump_to_merge = IRInstruction(
-                op=OpCode.JUMP,
-                src1=merge_label
-            )
+            jump_to_merge = IRInstruction(op=OpCode.JUMP, src1=merge_label)
             self.current_block.add_instruction(jump_to_merge)
 
+        # Else block
         else_block = BasicBlock(label=else_label)
         self.current_function.blocks.append(else_block)
         self.current_block = else_block
-
         if node.else_branch:
             self._generate_statement(node.else_branch)
-
         if not self.current_block.is_terminated():
-            jump_to_merge = IRInstruction(
-                op=OpCode.JUMP,
-                src1=merge_label
-            )
+            jump_to_merge = IRInstruction(op=OpCode.JUMP, src1=merge_label)
             self.current_block.add_instruction(jump_to_merge)
 
+        # Merge block
         merge_block = BasicBlock(label=merge_label)
         self.current_function.blocks.append(merge_block)
         self.current_block = merge_block
@@ -504,10 +472,7 @@ class IRGenerator:
         body_label = self.current_function.new_label()
         exit_label = self.current_function.new_label()
 
-        jump_to_header = IRInstruction(
-            op=OpCode.JUMP,
-            src1=header_label
-        )
+        jump_to_header = IRInstruction(op=OpCode.JUMP, src1=header_label)
         self.current_block.add_instruction(jump_to_header)
 
         header_block = BasicBlock(label=header_label)
@@ -524,10 +489,7 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_instr)
 
-        jump_to_exit = IRInstruction(
-            op=OpCode.JUMP,
-            src1=exit_label
-        )
+        jump_to_exit = IRInstruction(op=OpCode.JUMP, src1=exit_label)
         self.current_block.add_instruction(jump_to_exit)
 
         body_block = BasicBlock(label=body_label)
@@ -537,10 +499,7 @@ class IRGenerator:
         self._generate_statement(node.body)
 
         if not self.current_block.is_terminated():
-            jump_back = IRInstruction(
-                op=OpCode.JUMP,
-                src1=header_label
-            )
+            jump_back = IRInstruction(op=OpCode.JUMP, src1=header_label)
             self.current_block.add_instruction(jump_back)
 
         exit_block = BasicBlock(label=exit_label)
@@ -549,24 +508,17 @@ class IRGenerator:
 
     def _generate_for(self, node: ForStmtNode):
         """Generate IR for for loop."""
-        # Initialization
         if node.init:
             self._generate_statement(node.init)
 
-        # Loop labels
         header_label = self.current_function.new_label()
         body_label = self.current_function.new_label()
         increment_label = self.current_function.new_label()
         exit_label = self.current_function.new_label()
 
-        # Jump to header
-        jump_to_header = IRInstruction(
-            op=OpCode.JUMP,
-            src1=header_label
-        )
+        jump_to_header = IRInstruction(op=OpCode.JUMP, src1=header_label)
         self.current_block.add_instruction(jump_to_header)
 
-        # Header block (condition check)
         header_block = BasicBlock(label=header_label)
         self.current_function.blocks.append(header_block)
         self.current_block = header_block
@@ -581,35 +533,22 @@ class IRGenerator:
             )
             self.current_block.add_instruction(jump_if_instr)
         else:
-            # No condition, always jump to body
-            jump_if_instr = IRInstruction(
-                op=OpCode.JUMP,
-                src1=body_label
-            )
+            jump_if_instr = IRInstruction(op=OpCode.JUMP, src1=body_label)
             self.current_block.add_instruction(jump_if_instr)
 
-        jump_to_exit = IRInstruction(
-            op=OpCode.JUMP,
-            src1=exit_label
-        )
+        jump_to_exit = IRInstruction(op=OpCode.JUMP, src1=exit_label)
         self.current_block.add_instruction(jump_to_exit)
 
-        # Body block
         body_block = BasicBlock(label=body_label)
         self.current_function.blocks.append(body_block)
         self.current_block = body_block
 
         self._generate_statement(node.body)
 
-        # Jump to increment
         if not self.current_block.is_terminated():
-            jump_to_inc = IRInstruction(
-                op=OpCode.JUMP,
-                src1=increment_label
-            )
+            jump_to_inc = IRInstruction(op=OpCode.JUMP, src1=increment_label)
             self.current_block.add_instruction(jump_to_inc)
 
-        # Increment block
         increment_block = BasicBlock(label=increment_label)
         self.current_function.blocks.append(increment_block)
         self.current_block = increment_block
@@ -617,14 +556,9 @@ class IRGenerator:
         if node.update:
             self._generate_expression(node.update)
 
-        # Jump back to header
-        jump_back = IRInstruction(
-            op=OpCode.JUMP,
-            src1=header_label
-        )
+        jump_back = IRInstruction(op=OpCode.JUMP, src1=header_label)
         self.current_block.add_instruction(jump_back)
 
-        # Exit block
         exit_block = BasicBlock(label=exit_label)
         self.current_function.blocks.append(exit_block)
         self.current_block = exit_block
@@ -632,10 +566,12 @@ class IRGenerator:
     def _generate_call(self, node: CallNode) -> Operand:
         """Generate IR for function call."""
         result_temp = self.current_function.new_temp("int")
+        temp_counter = 0
 
-        # Generate PARAM instructions for arguments
+        # Generate PARAM instructions for arguments (x86-64 uses rdi, rsi, rdx, rcx, r8, r9)
         for i, arg in enumerate(node.arguments):
             arg_temp = self._generate_expression(arg)
+            # Store argument in a temp before passing
             param_instr = IRInstruction(
                 op=OpCode.PARAM,
                 dest=arg_temp,
@@ -656,50 +592,59 @@ class IRGenerator:
         return result_temp
 
     def _generate_array_decl(self, node):
+        """Generate IR for array declaration with heap allocation."""
         size_temp = self._generate_expression(node.size)
         mul_instr = IRInstruction(
             op=OpCode.MUL,
             dest=self.current_function.new_temp("int"),
             src1=size_temp,
             src2=Operand.literal(4, "int"),
-            comment="size * 4 bytes"
+            comment=f"array size in bytes for {node.name}"
         )
         self.current_block.add_instruction(mul_instr)
+        bytes_count = mul_instr.dest
 
         call_malloc = IRInstruction(
             op=OpCode.CALL,
             dest=self.current_function.new_temp("pointer"),
             src1=Operand.var("malloc", "function"),
-            comment="call malloc"
+            src2=bytes_count,
+            comment=f"malloc for array {node.name}"
         )
         self.current_block.add_instruction(call_malloc)
 
-        temp = self.current_function.new_temp("pointer")
-        self.var_to_temp[node.name] = temp
-        store_instr = IRInstruction(
+        arr_ptr = self.current_function.new_temp("pointer")
+        store_ptr = IRInstruction(
             op=OpCode.STORE,
-            dest=temp,
+            dest=arr_ptr,
             src1=call_malloc.dest,
-            comment=f"store array {node.name}"
+            comment=f"store array pointer for {node.name}"
         )
-        self.current_block.add_instruction(store_instr)
+        self.current_block.add_instruction(store_ptr)
+        self.var_to_temp[node.name] = arr_ptr
 
-        # Генерация кода для инициализации элементов массива
+        size_var = self.current_function.new_temp("int")
+        store_size = IRInstruction(
+            op=OpCode.STORE,
+            dest=size_var,
+            src1=size_temp,
+            comment=f"store array size for {node.name}"
+        )
+        self.current_block.add_instruction(store_size)
+        self.var_to_temp[f"{node.name}_size"] = size_var
+
         if node.initializer and isinstance(node.initializer, list):
             for i, init_expr in enumerate(node.initializer):
-                # Вычисляем значение
                 val_temp = self._generate_expression(init_expr)
 
-                # Загружаем указатель на массив
                 load_arr = IRInstruction(
                     op=OpCode.LOAD,
                     dest=self.current_function.new_temp("pointer"),
-                    src1=temp,
+                    src1=arr_ptr,
                     comment=f"load array {node.name}"
                 )
                 self.current_block.add_instruction(load_arr)
 
-                # Вычисляем смещение: i * 4
                 offset = IRInstruction(
                     op=OpCode.MUL,
                     dest=self.current_function.new_temp("int"),
@@ -709,7 +654,23 @@ class IRGenerator:
                 )
                 self.current_block.add_instruction(offset)
 
-                # TODO: store value at arr + offset
+                addr = self.current_function.new_temp("pointer")
+                gep = IRInstruction(
+                    op=OpCode.ADD,
+                    dest=addr,
+                    src1=load_arr.dest,
+                    src2=offset.dest,
+                    comment=f"address of arr[{i}]"
+                )
+                self.current_block.add_instruction(gep)
+
+                store_elem = IRInstruction(
+                    op=OpCode.STORE,
+                    dest=gep.dest,
+                    src1=val_temp,
+                    comment=f"arr[{i}] = {val_temp}"
+                )
+                self.current_block.add_instruction(store_elem)
 
     def _generate_array_access(self, node):
         """Generate IR for array access."""
@@ -722,7 +683,36 @@ class IRGenerator:
                 comment=f"load array {node.array}"
             )
             self.current_block.add_instruction(load_arr)
-            return load_arr.dest
+            
+            index_temp = self._generate_expression(node.index)
+            offset = IRInstruction(
+                op=OpCode.MUL,
+                dest=self.current_function.new_temp("int"),
+                src1=index_temp,
+                src2=Operand.literal(4, "int"),
+                comment=f"index * 4"
+            )
+            self.current_block.add_instruction(offset)
+            
+            addr = self.current_function.new_temp("pointer")
+            gep = IRInstruction(
+                op=OpCode.ADD,
+                dest=addr,
+                src1=load_arr.dest,
+                src2=offset.dest,
+                comment=f"address of {node.array}[{index_temp}]"
+            )
+            self.current_block.add_instruction(gep)
+            
+            load_val = IRInstruction(
+                op=OpCode.LOAD,
+                dest=self.current_function.new_temp("int"),
+                src1=addr,
+                comment=f"load {node.array}[{index_temp}]"
+            )
+            self.current_block.add_instruction(load_val)
+            return load_val.dest
+            
         return self.current_function.new_temp("int")
 
     def _get_type_name(self, type_obj) -> str:
@@ -742,16 +732,17 @@ class IRGenerator:
 
     def get_ir_text(self, func_name: str = None) -> str:
         """Get human-readable IR text."""
-        if func_name:
-            funcs = {func_name: self.functions[func_name]}
-        else:
-            funcs = self.functions
-
         lines = ["# Generated IR", "#" + "=" * 50]
 
-        for name, func in funcs.items():
+        if func_name:
+            funcs = [(func_name, self.functions[func_name])]
+        else:
+            funcs = self.functions.items()
+
+        for name, func in funcs:
             param_str = ', '.join([f'{p[0]}: {p[1]}' for p in func.parameters])
             lines.append(f"\nfunction {name}: {func.return_type} ({param_str})")
+
             sorted_blocks = sorted(func.blocks, key=lambda b: str(b.label) if b.label else "")
             for block in sorted_blocks:
                 if block.label:
@@ -763,3 +754,44 @@ class IRGenerator:
 
     def get_all_ir(self) -> Dict[str, IRFunction]:
         return self.functions
+
+    def generate_array_copy(self, dest_arr: str, src_arr: str, size: Operand):
+        """Generate memcpy(dest, src, size * 4)."""
+        dest_ptr = self.var_to_temp.get(dest_arr)
+        src_ptr = self.var_to_temp.get(src_arr)
+
+        if not dest_ptr or not src_ptr:
+            return
+
+        load_dest = IRInstruction(
+            op=OpCode.LOAD,
+            dest=self.current_function.new_temp("pointer"),
+            src1=dest_ptr
+        )
+        self.current_block.add_instruction(load_dest)
+
+        load_src = IRInstruction(
+            op=OpCode.LOAD,
+            dest=self.current_function.new_temp("pointer"),
+            src1=src_ptr
+        )
+        self.current_block.add_instruction(load_src)
+
+        bytes_count = self.current_function.new_temp("int")
+        mul = IRInstruction(
+            op=OpCode.MUL,
+            dest=bytes_count,
+            src1=size,
+            src2=Operand.literal(4, "int")
+        )
+        self.current_block.add_instruction(mul)
+
+        call_memcpy = IRInstruction(
+            op=OpCode.CALL,
+            dest=None,
+            src1=Operand.var("memcpy", "function"),
+            src2=load_dest.dest,
+            src3=load_src.dest,
+            src4=bytes_count
+        )
+        self.current_block.add_instruction(call_memcpy)

@@ -28,7 +28,8 @@ class Scanner:
             'false': TokenType.KW_FALSE,
             'void': TokenType.KW_VOID,
             'struct': TokenType.KW_STRUCT,
-            'fn': TokenType.KW_FN
+            'fn': TokenType.KW_FN,
+            'extern': TokenType.IDENTIFIER
         }
 
     def scan_tokens(self) -> List[Token]:
@@ -38,10 +39,8 @@ class Scanner:
             self._scan_token()
 
         # Вычисляем правильные строку и колонку для END_OF_FILE
-        # Проверяем, заканчивается ли файл переносом строки
         if self.source.endswith('\n'):
-            line = self.source.count('\n')  # Последняя строка уже учтена
-            # Находим последний перенос строки (не включая последний символ)
+            line = self.source.count('\n')
             last_newline = self.source.rfind('\n', 0, len(self.source) - 1)
             if last_newline == -1:
                 column = len(self.source)
@@ -67,7 +66,7 @@ class Scanner:
             self.line += 1
             self.column = 1
         elif c in ' \t\r':
-            pass  # Ignore whitespace
+            pass
         elif c == '/':
             if self._peek() == '/':
                 self._single_line_comment()
@@ -136,7 +135,9 @@ class Scanner:
             self._add_token(TokenType.COMMA)
         elif c == '"':
             self._string()
-        elif c.isdigit() or (c == '.' and self._peek().isdigit()):
+        elif c.isdigit():
+            self._number(c)
+        elif c == '.' and self._peek().isdigit():
             self._number(c)
         elif c.isalpha() or c == '_':
             self._identifier()
@@ -161,22 +162,23 @@ class Scanner:
     def _number(self, first_char: str):
         """Handle numeric literals"""
         is_float = False
+        number_str = ""
 
         if first_char == '.':
             is_float = True
+            number_str = "0."
             while self._peek().isdigit():
-                self._advance()
+                number_str += self._advance()
         else:
+            number_str = first_char
             while self._peek().isdigit():
-                self._advance()
+                number_str += self._advance()
 
-            if self._peek() == '.' and self._peek_next().isdigit():
+            if self._peek() == '.':
                 is_float = True
-                self._advance()  # Consume the '.'
+                number_str += self._advance()
                 while self._peek().isdigit():
-                    self._advance()
-
-        number_str = self.source[self.start:self.current]
+                    number_str += self._advance()
 
         if is_float:
             try:
@@ -205,7 +207,7 @@ class Scanner:
             self._error("Unterminated string")
             return
 
-        self._advance()  # Consume closing "
+        self._advance()
         value = self.source[self.start + 1:self.current - 1]
         self._add_token(TokenType.STRING_LITERAL, value)
 
@@ -213,7 +215,6 @@ class Scanner:
         """Handle single-line comments"""
         while self._peek() != '\n' and not self.is_at_end():
             self._advance()
-        # Don't add token, just consume
 
     def _multi_line_comment(self):
         """Handle multi-line comments"""
@@ -221,12 +222,12 @@ class Scanner:
 
         while nesting_level > 0 and not self.is_at_end():
             if self._peek() == '*' and self._peek_next() == '/':
-                self._advance()  # Consume '*'
-                self._advance()  # Consume '/'
+                self._advance()
+                self._advance()
                 nesting_level -= 1
             elif self._peek() == '/' and self._peek_next() == '*':
-                self._advance()  # Consume '/'
-                self._advance()  # Consume '*'
+                self._advance()
+                self._advance()
                 nesting_level += 1
             else:
                 if self._peek() == '\n':
@@ -241,10 +242,9 @@ class Scanner:
         """Add a token to the list"""
         text = self.source[self.start:self.current]
 
-        # Вычисляем номер колонки (начинается с 1)
         last_newline = self.source.rfind('\n', 0, self.start)
         if last_newline == -1:
-            column = self.start + 1  # +1 потому что колонки с 1
+            column = self.start + 1
         else:
             column = self.start - last_newline
 
@@ -287,7 +287,6 @@ class Scanner:
 
     def _error(self, message: str):
         """Report an error"""
-        # Get the current line for context
         line_start = self.source.rfind('\n', 0, self.start) + 1
         line_end = self.source.find('\n', self.start)
         if line_end == -1:

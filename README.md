@@ -1,6 +1,7 @@
+
 # MiniCompiler
 
-Лёгкая реализация компилятора для языка, похожего на C, с поддержкой лексического, синтаксического и семантического анализа (построение AST, проверка типов, таблица символов), генерацией промежуточного представления (IR), генерацией x86-64 ассемблерного кода, системой оптимизаций и набором тестов.
+Лёгкая реализация компилятора для языка, похожего на C, с поддержкой лексического, синтаксического и семантического анализа (построение AST, проверка типов, таблица символов), генерацией промежуточного представления (IR), генерацией x86-64 ассемблерного кода, системой оптимизаций, полноценным CLI и набором тестов.
 
 ## Команда
 
@@ -87,13 +88,35 @@
   - **Optimization pipeline** — цепочка последовательных оптимизаций
 
 - **Демонстрационная программа:**
-  - Рекурсивный факториал (`demo_factorial.src`)
+  - Факториал (цикл/рекурсия) (`demo_factorial.src`)
   - Алгоритм быстрой сортировки Quicksort с использованием массивов
 
 - **Тестирование:**
   - Тесты для массивов (объявление, инициализация, доступ)
   - Тесты для внешних вызовов
   - Тесты для оптимизаций (constant folding, propagation, dead code elimination)
+
+### Спринт 8 (CLI, Makefile, установка и демо-меню)
+- **Command Line Interface (CLI):**
+  - Скрипт `mycc` для вызова компилятора из командной строки
+  - Поддержка опций: `--version`, `--help`
+  - Базовый парсинг аргументов для входного файла
+
+- **Система сборки (Makefile):**
+  - `make` / `make all` — подготовка CLI
+  - `make test-all` — запуск всех тестов (лексер, парсер, семантика, Sprint 7)
+  - `make clean` — удаление временных и объектных файлов
+  - `make install` — установка `mycc` в `/usr/local/bin/`
+
+- **Демонстрационное меню:**
+  - Скрипт `minicc.sh` с интерактивным меню для защиты
+  - Пункты: запуск тестов, компиляция программ, просмотр IR и ассемблера
+  - Цветное оформление и удобная навигация
+
+- **Переносимость:**
+  - Поддержка Linux (основная платформа)
+  - Работа через WSL на Windows
+  - Архивация проекта для переноса на другие компьютеры
 
 ## Спецификация языка
 
@@ -175,10 +198,13 @@ compiler-project/
 │   ├── source.c
 │   ├── output.asm
 │   └── demo.bat
-├── demo_factorial.src          # Sprint 7: демо-программа (факториал)
-├── demo_quicksort.src          # Sprint 7: демо-программа (быстрая сортировка)
+├── demo_factorial.src          # Sprint 7-8: демо-программа (факториал)
+├── demo_quicksort.src          # Sprint 7-8: демо-программа (быстрая сортировка)
 ├── docs/
 │   └── language_spec.md
+├── mycc                        # Sprint 8: CLI скрипт
+├── Makefile                    # Sprint 8: система сборки
+├── minicc.sh                   # Sprint 8: интерактивное демо-меню
 ├── README.md
 ├── pyproject.toml
 └── setup.py
@@ -200,11 +226,12 @@ compiler-project/
 git clone <repository-url>
 cd compiler-project
 
-# Установка в режиме разработки
-pip install -e .
+# Быстрая установка (CLI + Makefile)
+make install
 
-# Или установка с зависимостями для тестирования
-pip install -e .[test]
+# Или ручная установка
+pip install -e .
+chmod +x mycc
 ```
 
 ### Примечания для разных платформ
@@ -214,6 +241,7 @@ pip install -e .[test]
 python3 -m venv venv
 source venv/bin/activate
 pip install -e .
+make install
 ```
 
 **Windows (рекомендуется WSL):**
@@ -221,6 +249,7 @@ pip install -e .
 # Для генерации ассемблера лучше использовать WSL
 wsl
 cd /mnt/c/Users/user/PycharmProjects/compiler-project
+make install
 ```
 
 ## Быстрый старт
@@ -273,10 +302,15 @@ python src/main.py --input test_asm.src --ir --ir-output test.ir
 python src/main.py --input test_asm.src --ir --ir-format json
 ```
 
-### Генерация x86-64 ассемблерного кода — Sprint 5-7
+### Генерация x86-64 ассемблерного кода — Sprint 5-8
 
 ```bash
-# Полный пайплайн: исходник → IR → ассемблер
+# Полный пайплайн: исходник → IR → ассемблер (через CLI)
+./mycc demo_factorial.src -o factorial
+./factorial
+echo $?  # 5! = 120
+
+# Или напрямую через Python
 python -c "
 from src.lexer.scanner import Scanner
 from src.parser.parser import Parser
@@ -303,8 +337,38 @@ gcc -no-pie output.o -o output_program
 
 # Запуск
 ./output_program
-echo $?  # выводит код возврата (результат программы)
+echo $?
 ```
+
+### Использование CLI (Sprint 8)
+
+```bash
+# Показать версию
+./mycc --version
+
+# Показать справку
+./mycc --help
+
+# Скомпилировать программу
+./mycc demo_factorial.src -o factorial
+./factorial
+
+# Запустить интерактивное меню
+./minicc.sh
+```
+
+### Интерактивное демо-меню (Sprint 8)
+
+```bash
+./minicc.sh
+```
+
+Меню предоставляет:
+1. Запуск всех тестов
+2. Просмотр IR для массивов (malloc)
+3. Компиляцию и запуск factorial
+4. Просмотр сгенерированного ассемблера
+5. Просмотр кода оптимизатора и генератора
 
 ### Пример исходного файла с массивами (Sprint 7)
 
@@ -379,25 +443,14 @@ int compute() {
 ### Запуск всех тестов
 
 ```bash
-# Тесты лексера
-python tests/test_runner.py
+# Через Makefile (рекомендуется)
+make test-all
 
-# Тесты парсера
-python tests/parser/test_parser.py
-
-# Семантические тесты
-python tests/semantic/run_tests.py
-
-# Тесты IR генерации (Sprint 4)
-python test_ir_arithmetic.py
-python test_ir_if.py
-python test_ir_while.py
-
-# Тесты управляющих конструкций (Sprint 6)
-python tests/control_flow/run_tests.py
-
-# Тесты Sprint 7 (массивы и оптимизации)
-python tests/test_sprint7.py
+# Или по отдельности
+python tests/test_runner.py          # лексер
+python tests/parser/test_parser.py   # парсер
+python tests/semantic/run_tests.py   # семантика
+python tests/test_sprint7.py         # Sprint 7
 
 # С использованием pytest
 pytest tests/ -v
@@ -409,6 +462,25 @@ pytest tests/ -v
 - **TEST-2:** Внешние вызовы (printf, malloc, free)
 - **TEST-3:** Constant folding и propagation
 - **TEST-4:** Dead code elimination и optimization pipeline
+
+### Результаты тестирования
+
+```
+=== SPRINT 7 TESTS ===
+✓ TEST-1: Array declaration works
+✓ TEST-1: Array initialization works
+✓ TEST-3: Constant folding works
+✓ TEST-4: Optimizer stats: {'constants_propagated': 1, ...}
+
+=== Lexer Tests ===
+Results: 25 passed, 0 failed
+
+=== Parser Tests ===
+Всего тестов: 16, Пройдено: 16
+
+=== Semantic Tests ===
+SUMMARY: 2 passed, 0 failed
+```
 
 ## Грамматика языка (EBNF)
 
@@ -452,7 +524,13 @@ pytest tests/ -v
   - Массивов (malloc, free, bounds checking)
   - Внешних вызовов (printf, malloc, free, memcpy)
 
-### Ключевые особенности
+### Компоненты CLI и сборки (Sprint 8)
+- **mycc**: Скрипт-обёртка для вызова компилятора
+- **Makefile**: Цели `all`, `test-all`, `clean`, `install`
+- **minicc.sh**: Интерактивное демо-меню с цветным выводом
+
+## Ключевые особенности
+
 - Точное отслеживание позиции (строка/столбец)
 - Поддержка UTF-8
 - Восстановление после ошибок
@@ -461,16 +539,20 @@ pytest tests/ -v
 - Проверка типов с неявным расширением
 - Трёхадресный код с виртуальными регистрами
 - Визуализация CFG в формате DOT
-- **Новое (Sprint 5):** Генерация ассемблера x86-64 с соблюдением ABI
-- **Новое (Sprint 5):** Runtime библиотека для вывода и ввода
-- **Новое (Sprint 6):** Поддержка if/else, циклов while/for
-- **Новое (Sprint 6):** Short-circuit evaluation для && и ||
-- **Новое (Sprint 6):** Генерация условных переходов x86-64
-- **Новое (Sprint 7):** Поддержка массивов (синтаксис, выделение в куче, bounds checking)
-- **Новое (Sprint 7):** Внешние вызовы стандартной библиотеки C
-- **Новое (Sprint 7):** Оптимизации IR (constant folding, propagation, dead code elimination)
+- **Sprint 5:** Генерация ассемблера x86-64 с соблюдением ABI
+- **Sprint 5:** Runtime библиотека для вывода и ввода
+- **Sprint 6:** Поддержка if/else, циклов while/for
+- **Sprint 6:** Short-circuit evaluation для && и ||
+- **Sprint 6:** Генерация условных переходов x86-64
+- **Sprint 7:** Поддержка массивов (синтаксис, выделение в куче, bounds checking)
+- **Sprint 7:** Внешние вызовы стандартной библиотеки C
+- **Sprint 7:** Оптимизации IR (constant folding, propagation, dead code elimination)
+- **Sprint 8:** Профессиональный CLI с опциями и Makefile
+- **Sprint 8:** Интерактивное демо-меню для защиты
+- **Sprint 8:** Упрощённая установка и переносимость
 
-### Производительность
+## Производительность
+
 - Лексер: O(n)
 - Парсер: O(n) для LL(1) грамматики
 - Семантический анализ: O(n)
@@ -478,4 +560,7 @@ pytest tests/ -v
 - Оптимизации IR: O(n) за проход
 - Генерация ассемблера: O(n) с одним проходом
 - Память: пропорционально размеру AST, таблице символов, IR и ассемблеру
-```
+
+## Лицензия
+
+Индивидуальный проект в рамках курса по конструированию компиляторов.

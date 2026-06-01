@@ -1,0 +1,4 @@
+int main() {
+    int arr[3] = {100, 200, 300};
+    return arr[1];
+}

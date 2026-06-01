@@ -1,5 +1,4 @@
 """x86-64 code generator from IR - with unique labels per function."""
-
 from typing import Dict, List, Optional
 from ..ir.ir_instructions import IRInstruction, IRFunction, OpCode, Operand, OperandType
 from ..ir.basic_block import BasicBlock
@@ -37,7 +36,7 @@ class X86Generator:
         output.append("    mov rdi, rax")
         output.append("    mov rax, 60")
         output.append("    syscall")
-        
+
         return "\n".join(output)
 
     def _generate_function(self, func: IRFunction) -> str:
@@ -58,15 +57,13 @@ class X86Generator:
         for block in func.blocks:
             if block.label:
                 label_str = str(block.label).replace(':', '').replace('.', '_')
-                lines.append(f"{label_str}_{func.name}:")
+                lines.append(f"{label_str}_{self.current_func_name}:")
             for instr in block.instructions:
                 asm = self._generate_instruction(instr)
                 if asm:
-                    for line in asm.split('\n'):
-                        if line.strip():
-                            lines.append(f"    {line}")
+                    lines.append(f"    {asm}")
 
-        lines.append(f"_epilogue_{func.name}:")
+        lines.append(f"_epilogue_{self.current_func_name}:")
         lines.append("    mov rsp, rbp")
         lines.append("    pop rbp")
         lines.append("    ret")
@@ -74,13 +71,16 @@ class X86Generator:
         return "\n".join(lines)
 
     def _allocate_slots(self, func: IRFunction):
+        """Выделяет слоты стека для всех переменных И временных значений."""
         vars_set = set()
         for block in func.blocks:
             for instr in block.instructions:
-                for op in [instr.dest, instr.src1, instr.src2, instr.src3]:
-                    if op and op.type == OperandType.VARIABLE:
-                        vars_set.add(op.value)
-        for var in vars_set:
+                for op in [instr.dest, instr.src1, instr.src2, instr.src3, instr.src4]:
+                    if op and op.type in (OperandType.VARIABLE, OperandType.TEMP):
+                        name = str(op).strip()
+                        if name not in ['rdi', 'rsi', 'rax', 'rbx', 'rcx', 'rdx']:
+                            vars_set.add(name)
+        for var in sorted(vars_set):
             self.var_locations[var] = self.next_offset
             self.next_offset += 8
 
@@ -100,7 +100,7 @@ class X86Generator:
         elif op == OpCode.LOAD:
             return self._gen_load(instr)
         elif op == OpCode.JUMP:
-            return f"jmp {self._fix_label(instr.src1)}"
+            return "jmp " + self._fix_label(instr.src1)
         elif op == OpCode.JUMP_IF:
             return self._gen_jump_if(instr)
         elif op == OpCode.JUMP_IF_NOT:
@@ -109,7 +109,7 @@ class X86Generator:
             return self._gen_return(instr)
         elif op == OpCode.CALL:
             return self._gen_call(instr)
-        elif op in [OpCode.CMP_EQ, OpCode.CMP_NE, OpCode.CMP_LT, 
+        elif op in [OpCode.CMP_EQ, OpCode.CMP_NE, OpCode.CMP_LT,
                     OpCode.CMP_LE, OpCode.CMP_GT, OpCode.CMP_GE]:
             jump_map = {
                 OpCode.CMP_EQ: "je", OpCode.CMP_NE: "jne",
@@ -124,46 +124,88 @@ class X86Generator:
         elif op == OpCode.NOT:
             return self._gen_logical_not(instr)
 
-        return f"; TODO: {op.value}"
+        return "; TODO: " + op.value
 
     def _fix_label(self, label):
         label_str = str(label).replace(':', '').replace('.', '_')
-        return f"{label_str}_{self.current_func_name}"
+        return label_str + "_" + self.current_func_name
+
+    def _to_asm(self, op):
+        """Преобразует операнд IR в ассемблерный операнд.
+        И TEMP, и VARIABLE живут в стеке -> [rbp-X]."""
+        if op is None:
+            return "0"
+        if op.type == OperandType.LITERAL:
+            if isinstance(op.value, bool):
+                return "1" if op.value else "0"
+            return str(op.value)
+        elif op.type in (OperandType.TEMP, OperandType.VARIABLE):
+            name = str(op).strip()
+            if name in ['rdi', 'rsi', 'rax', 'rbx', 'rcx', 'rdx']:
+                return name
+            offset = self.var_locations.get(name, 8)
+            return f"[rbp-{offset}]"
+        elif op.type == OperandType.LABEL:
+            return self._fix_label(op)
+        return "0"
 
     def _gen_binary(self, instr, asm_op):
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
         lines = []
-        lines.append(f"mov eax, {src1_asm}")
-        lines.append(f"{asm_op} eax, {src2_asm}")
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        lines.append("mov rax, " + src1_asm)
+        lines.append(asm_op + " rax, " + src2_asm)
+        if instr.dest:
+            dest_asm = self._to_asm(instr.dest)
+            lines.append("mov " + dest_asm + ", rax")
         return "\n    ".join(lines)
 
     def _gen_mul(self, instr):
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
-        lines = [f"mov eax, {src1_asm}", f"imul eax, {src2_asm}"]
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        lines = ["mov rax, " + src1_asm, "imul rax, " + src2_asm]
+        if instr.dest:
+            dest_asm = self._to_asm(instr.dest)
+            lines.append("mov " + dest_asm + ", rax")
         return "\n    ".join(lines)
 
     def _gen_div(self, instr):
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
-        lines = [f"mov eax, {src1_asm}", "cdq", f"idiv {src2_asm}"]
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        lines = ["mov rax, " + src1_asm, "cqo", "idiv " + src2_asm]
+        if instr.dest:
+            dest_asm = self._to_asm(instr.dest)
+            lines.append("mov " + dest_asm + ", rax")
         return "\n    ".join(lines)
 
     def _gen_store(self, instr):
+        """Сохранение. Если dest - адрес элемента массива (ir_type == 'address'),
+        то разыменовываем: mov rax, [адрес]; mov [rax], значение."""
         dest_asm = self._to_asm(instr.dest)
         src_asm = self._to_asm(instr.src1)
+
+        # Разыменование: dest - это адрес, по которому нужно записать
+        if instr.dest and instr.dest.ir_type == "address":
+            return f"mov rax, {dest_asm}\n    mov rcx, {src_asm}\n    mov [rax], rcx"
+
+        # Обычное сохранение в слот переменной/темпа
+        if dest_asm.startswith('[') and src_asm.startswith('['):
+            return f"mov rax, {src_asm}\n    mov {dest_asm}, rax"
         return f"mov {dest_asm}, {src_asm}"
 
     def _gen_load(self, instr):
+        """Загрузка. Если src1 - адрес элемента массива (ir_type == 'address'),
+        то разыменовываем: mov rax, [адрес]; mov результат, [rax]."""
         src_asm = self._to_asm(instr.src1)
         dest_asm = self._to_asm(instr.dest)
+
+        # Разыменование: src1 - это адрес, откуда читаем значение
+        if instr.src1 and instr.src1.ir_type == "address":
+            return f"mov rax, {src_asm}\n    mov rcx, [rax]\n    mov {dest_asm}, rcx"
+
+        # Обычная загрузка значения из одного слота в другой
+        if src_asm.startswith('[') and dest_asm.startswith('['):
+            return f"mov rax, {src_asm}\n    mov {dest_asm}, rax"
         return f"mov {dest_asm}, {src_asm}"
 
     def _gen_jump_if(self, instr):
@@ -179,143 +221,143 @@ class X86Generator:
     def _gen_return(self, instr):
         if instr.dest:
             dest_asm = self._to_asm(instr.dest)
-            return f"mov eax, {dest_asm}\n    jmp _epilogue_{self.current_func_name}"
+            return f"mov rax, {dest_asm}\n    jmp _epilogue_{self.current_func_name}"
         return f"jmp _epilogue_{self.current_func_name}"
 
     def _gen_call(self, instr):
-        func_name = str(instr.src1)
+        func_name = str(instr.src1).strip()
 
         if func_name in ["printf", "malloc", "free", "memcpy", "exit"]:
-            lines = [f"; call {func_name}"]
-            
+            lines = ["; call " + func_name]
+
             if func_name == "malloc":
                 if instr.src2:
-                    lines.append(f"mov rdi, {self._to_asm(instr.src2)}")
-                lines.append("    xor eax, eax")
+                    lines.append("mov rdi, " + self._to_asm(instr.src2))
+                lines.append("    xor rax, rax")
                 lines.append("    call malloc")
                 self.malloc_label_counter += 1
-                ok_label = f"malloc_ok_{self.malloc_label_counter}"
+                ok_label = "malloc_ok_" + str(self.malloc_label_counter)
                 lines.append("    test rax, rax")
-                lines.append(f"    jnz {ok_label}")
+                lines.append("    jnz " + ok_label)
                 lines.append("    mov rdi, malloc_error_msg")
+                lines.append("    xor rax, rax")
                 lines.append("    call printf")
                 lines.append("    mov rdi, 1")
                 lines.append("    call exit")
-                lines.append(f"{ok_label}:")
+                lines.append(ok_label + ":")
                 if instr.dest:
-                    lines.append(f"mov {self._to_asm(instr.dest)}, rax")
+                    lines.append("mov " + self._to_asm(instr.dest) + ", rax")
                 return "\n    ".join(lines)
-            
+
             elif func_name == "free":
                 if instr.src2:
-                    lines.append(f"mov rdi, {self._to_asm(instr.src2)}")
-                lines.append("    xor eax, eax")
+                    lines.append("mov rdi, " + self._to_asm(instr.src2))
+                lines.append("    xor rax, rax")
                 lines.append("    call free")
                 return "\n    ".join(lines)
-            
-            lines.append("    xor eax, eax")
-            lines.append(f"    call {func_name}")
+
+            lines.append("    xor rax, rax")
+            lines.append("    call " + func_name)
             return "\n    ".join(lines)
-        
-        return f"call {func_name}"
+
+        lines = ["; call " + func_name]
+
+        if instr.src2 is not None:
+            lines.append("mov rdi, " + self._to_asm(instr.src2))
+        if instr.src3 is not None:
+            lines.append("mov rsi, " + self._to_asm(instr.src3))
+        if instr.src4 is not None:
+            lines.append("mov rdx, " + self._to_asm(instr.src4))
+
+        lines.append("    xor rax, rax")
+        lines.append("    call " + func_name)
+
+        if instr.dest:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+
+        return "\n    ".join(lines)
 
     def _gen_compare(self, instr, jump_inst):
         self.label_counter += 1
-        true_label = self._fix_label(f"_cmp_true_{self.label_counter}")
-        end_label = self._fix_label(f"_cmp_end_{self.label_counter}")
+        true_label = self._fix_label("_cmp_true_" + str(self.label_counter))
+        end_label = self._fix_label("_cmp_end_" + str(self.label_counter))
 
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
 
         lines = [
-            f"mov eax, {src1_asm}",
-            f"cmp eax, {src2_asm}",
-            f"{jump_inst} {true_label}",
-            f"mov eax, 0",
-            f"jmp {end_label}",
-            f"{true_label}:",
-            f"mov eax, 1",
-            f"{end_label}:",
+            "mov rax, " + src1_asm,
+            "cmp rax, " + src2_asm,
+            jump_inst + " " + true_label,
+            "mov rax, 0",
+            "jmp " + end_label,
+            true_label + ":",
+            "mov rax, 1",
+            end_label + ":",
         ]
 
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        if instr.dest:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
 
         return "\n    ".join(lines)
 
     def _gen_logical_and(self, instr):
         self.label_counter += 1
-        false_label = self._fix_label(f"_land_false_{self.label_counter}")
-        end_label = self._fix_label(f"_land_end_{self.label_counter}")
+        false_label = self._fix_label("_land_false_" + str(self.label_counter))
+        end_label = self._fix_label("_land_end_" + str(self.label_counter))
 
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
 
         lines = [
-            f"mov eax, {src1_asm}",
-            f"cmp eax, 1",
-            f"jne {false_label}",
-            f"mov eax, {src2_asm}",
-            f"cmp eax, 1",
-            f"jne {false_label}",
-            f"mov eax, 1",
-            f"jmp {end_label}",
-            f"{false_label}:",
-            f"mov eax, 0",
-            f"{end_label}:",
+            "mov rax, " + src1_asm,
+            "cmp rax, 1",
+            "jne " + false_label,
+            "mov rax, " + src2_asm,
+            "cmp rax, 1",
+            "jne " + false_label,
+            "mov rax, 1",
+            "jmp " + end_label,
+            false_label + ":",
+            "mov rax, 0",
+            end_label + ":",
         ]
 
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        if instr.dest:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
 
         return "\n    ".join(lines)
 
     def _gen_logical_or(self, instr):
         self.label_counter += 1
-        true_label = self._fix_label(f"_lor_true_{self.label_counter}")
-        end_label = self._fix_label(f"_lor_end_{self.label_counter}")
+        true_label = self._fix_label("_lor_true_" + str(self.label_counter))
+        end_label = self._fix_label("_lor_end_" + str(self.label_counter))
 
         src1_asm = self._to_asm(instr.src1)
         src2_asm = self._to_asm(instr.src2)
 
         lines = [
-            f"mov eax, {src1_asm}",
-            f"cmp eax, 1",
-            f"je {true_label}",
-            f"mov eax, {src2_asm}",
-            f"cmp eax, 1",
-            f"je {true_label}",
-            f"mov eax, 0",
-            f"jmp {end_label}",
-            f"{true_label}:",
-            f"mov eax, 1",
-            f"{end_label}:",
+            "mov rax, " + src1_asm,
+            "cmp rax, 1",
+            "je " + true_label,
+            "mov rax, " + src2_asm,
+            "cmp rax, 1",
+            "je " + true_label,
+            "mov rax, 0",
+            "jmp " + end_label,
+            true_label + ":",
+            "mov rax, 1",
+            end_label + ":",
         ]
 
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        if instr.dest:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
 
         return "\n    ".join(lines)
 
     def _gen_logical_not(self, instr):
         src_asm = self._to_asm(instr.src1)
-        lines = [f"mov eax, {src_asm}", f"xor eax, 1"]
-        if instr.dest and instr.dest.type == OperandType.VARIABLE:
-            lines.append(f"mov {self._to_asm(instr.dest)}, eax")
+        lines = ["mov rax, " + src_asm, "xor rax, 1"]
+        if instr.dest:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
         return "\n    ".join(lines)
-
-    def _to_asm(self, op):
-        if op is None:
-            return "0"
-        if op.type == OperandType.LITERAL:
-            if isinstance(op.value, bool):
-                return "1" if op.value else "0"
-            return str(op.value)
-        elif op.type == OperandType.VARIABLE:
-            offset = self.var_locations.get(op.value, 8)
-            return f"[rbp-{offset}]"
-        elif op.type == OperandType.TEMP:
-            return "eax"
-        elif op.type == OperandType.LABEL:
-            return self._fix_label(op)
-        return "0"

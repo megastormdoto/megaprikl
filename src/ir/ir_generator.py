@@ -1,15 +1,14 @@
 """IR Generator - traverses decorated AST and produces Intermediate Representation."""
-
 from typing import Dict, List, Optional, Any
 from src.parser.ast import (
     ProgramNode, FunctionDeclNode, VarDeclNode, StructDeclNode,
     BlockNode, IfStmtNode, WhileStmtNode, ForStmtNode, ReturnStmtNode,
     AssignmentNode, BinaryExprNode, UnaryExprNode, CallNode,
-    IdentifierNode, LiteralNode, ExprStmtNode, ParameterNode, ArrayDeclNode, ArrayAccessNode
+    IdentifierNode, LiteralNode, ExprStmtNode, ParameterNode,
+    ArrayDeclNode, ArrayAccessNode
 )
 from src.semantic.symbol_table import SymbolTable, Symbol
 from src.semantic.type_system import Type, BaseType
-
 from .ir_instructions import (
     IRInstruction, IRFunction, Operand, OpCode, OperandType
 )
@@ -66,9 +65,26 @@ class IRGenerator:
         ir_func.blocks.append(entry_block)
 
         # Map parameters to temporaries
-        for param_name, param_type in ir_func.parameters:
+        for i, (param_name, param_type) in enumerate(ir_func.parameters):
             temp = ir_func.new_temp(param_type)
             self.var_to_temp[param_name] = temp
+
+            # Store parameter from register to temporary
+            # rdi for first, rsi for second
+            if i == 0:
+                param_reg = Operand.var("rdi", param_type)
+            elif i == 1:
+                param_reg = Operand.var("rsi", param_type)
+            else:
+                param_reg = Operand.literal(0, param_type)
+
+            store_instr = IRInstruction(
+                op=OpCode.STORE,
+                dest=temp,
+                src1=param_reg,
+                comment=f"store parameter {param_name} from register"
+            )
+            self.current_block.add_instruction(store_instr)
 
         self._generate_block(node.body)
 
@@ -139,7 +155,11 @@ class IRGenerator:
             self.current_block.add_instruction(store_instr)
 
     def _generate_assignment(self, node: AssignmentNode):
-        """Generate IR for assignment."""
+        """Generate IR for assignment - handles array elements."""
+        if isinstance(node.target, ArrayAccessNode):
+            self._generate_array_assignment(node.target, node.value)
+            return
+
         if node.target in self.var_to_temp:
             target_temp = self.var_to_temp[node.target]
         else:
@@ -155,6 +175,51 @@ class IRGenerator:
             comment=f"assign {node.target}"
         )
         self.current_block.add_instruction(store_instr)
+
+    def _generate_array_assignment(self, array_access: ArrayAccessNode, value_node):
+        """Generate IR for array element assignment."""
+        if array_access.array in self.var_to_temp:
+            arr_ptr = self.var_to_temp[array_access.array]
+
+            load_arr = IRInstruction(
+                op=OpCode.LOAD,
+                dest=self.current_function.new_temp("pointer"),
+                src1=arr_ptr,
+                comment=f"load array {array_access.array} pointer"
+            )
+            self.current_block.add_instruction(load_arr)
+
+            index_temp = self._generate_expression(array_access.index)
+            offset = IRInstruction(
+                op=OpCode.MUL,
+                dest=self.current_function.new_temp("int"),
+                src1=index_temp,
+                src2=Operand.literal(4, "int"),
+                comment=f"byte offset"
+            )
+            self.current_block.add_instruction(offset)
+
+            # ВАЖНО: адрес элемента помечаем как "address", чтобы x86_generator
+            # знал, что его нужно разыменовывать при STORE
+            addr = self.current_function.new_temp("address")
+            gep = IRInstruction(
+                op=OpCode.ADD,
+                dest=addr,
+                src1=load_arr.dest,
+                src2=offset.dest,
+                comment=f"address of {array_access.array}[{index_temp}]"
+            )
+            self.current_block.add_instruction(gep)
+
+            rhs_temp = self._generate_expression(value_node)
+
+            store_elem = IRInstruction(
+                op=OpCode.STORE,
+                dest=gep.dest,
+                src1=rhs_temp,
+                comment=f"store element"
+            )
+            self.current_block.add_instruction(store_elem)
 
     def _generate_expression(self, node) -> Operand:
         """Generate IR for expression and return result temp."""
@@ -203,7 +268,7 @@ class IRGenerator:
             return self.current_function.new_temp("int")
 
     def _generate_binary_op(self, node: BinaryExprNode) -> Operand:
-        """Generate IR for binary operation with constant folding and short-circuit."""
+        """Generate IR for binary operation."""
         from src.parser.ast import LiteralNode
 
         left_is_const = isinstance(node.left, LiteralNode)
@@ -419,14 +484,13 @@ class IRGenerator:
         self.current_block.add_instruction(ret_instr)
 
     def _generate_if(self, node: IfStmtNode):
-        """Generate IR for if statement with proper control flow."""
+        """Generate IR for if statement."""
         cond_temp = self._generate_expression(node.condition)
 
         then_label = self.current_function.new_label()
         else_label = self.current_function.new_label()
         merge_label = self.current_function.new_label()
 
-        # Jump to then if condition true
         jump_if_instr = IRInstruction(
             op=OpCode.JUMP_IF,
             dest=cond_temp,
@@ -435,14 +499,12 @@ class IRGenerator:
         )
         self.current_block.add_instruction(jump_if_instr)
 
-        # Jump to else
         jump_to_else = IRInstruction(
             op=OpCode.JUMP,
             src1=else_label
         )
         self.current_block.add_instruction(jump_to_else)
 
-        # Then block
         then_block = BasicBlock(label=then_label)
         self.current_function.blocks.append(then_block)
         self.current_block = then_block
@@ -451,7 +513,6 @@ class IRGenerator:
             jump_to_merge = IRInstruction(op=OpCode.JUMP, src1=merge_label)
             self.current_block.add_instruction(jump_to_merge)
 
-        # Else block
         else_block = BasicBlock(label=else_label)
         self.current_function.blocks.append(else_block)
         self.current_block = else_block
@@ -461,7 +522,6 @@ class IRGenerator:
             jump_to_merge = IRInstruction(op=OpCode.JUMP, src1=merge_label)
             self.current_block.add_instruction(jump_to_merge)
 
-        # Merge block
         merge_block = BasicBlock(label=merge_label)
         self.current_function.blocks.append(merge_block)
         self.current_block = merge_block
@@ -566,40 +626,44 @@ class IRGenerator:
     def _generate_call(self, node: CallNode) -> Operand:
         """Generate IR for function call."""
         result_temp = self.current_function.new_temp("int")
-        temp_counter = 0
 
-        # Generate PARAM instructions for arguments (x86-64 uses rdi, rsi, rdx, rcx, r8, r9)
-        for i, arg in enumerate(node.arguments):
+        # Generate all arguments
+        arg_temps = []
+        for arg in node.arguments:
             arg_temp = self._generate_expression(arg)
-            # Store argument in a temp before passing
-            param_instr = IRInstruction(
-                op=OpCode.PARAM,
-                dest=arg_temp,
-                src1=Operand.literal(i, "int"),
-                comment=f"param {i} for {node.callee}"
+            arg_temps.append(arg_temp)
+
+        # Create call instruction with arguments in src2, src3, etc.
+        if len(arg_temps) >= 1:
+            call_instr = IRInstruction(
+                op=OpCode.CALL,
+                dest=result_temp,
+                src1=Operand.var(node.callee, "function"),
+                src2=arg_temps[0],
+                comment=f"call {node.callee} with {len(arg_temps)} args"
             )
-            self.current_block.add_instruction(param_instr)
+            if len(arg_temps) >= 2:
+                call_instr.src3 = arg_temps[1]
+        else:
+            call_instr = IRInstruction(
+                op=OpCode.CALL,
+                dest=result_temp,
+                src1=Operand.var(node.callee, "function"),
+                comment=f"call {node.callee}"
+            )
 
-        # Generate CALL instruction
-        call_instr = IRInstruction(
-            op=OpCode.CALL,
-            dest=result_temp,
-            src1=Operand.var(node.callee, "function"),
-            comment=f"call {node.callee}"
-        )
         self.current_block.add_instruction(call_instr)
-
         return result_temp
 
     def _generate_array_decl(self, node):
-        """Generate IR for array declaration with heap allocation."""
+        """Generate IR for array declaration."""
         size_temp = self._generate_expression(node.size)
         mul_instr = IRInstruction(
             op=OpCode.MUL,
             dest=self.current_function.new_temp("int"),
             src1=size_temp,
             src2=Operand.literal(4, "int"),
-            comment=f"array size in bytes for {node.name}"
+            comment=f"array size in bytes"
         )
         self.current_block.add_instruction(mul_instr)
         bytes_count = mul_instr.dest
@@ -618,7 +682,7 @@ class IRGenerator:
             op=OpCode.STORE,
             dest=arr_ptr,
             src1=call_malloc.dest,
-            comment=f"store array pointer for {node.name}"
+            comment=f"store array pointer"
         )
         self.current_block.add_instruction(store_ptr)
         self.var_to_temp[node.name] = arr_ptr
@@ -628,7 +692,7 @@ class IRGenerator:
             op=OpCode.STORE,
             dest=size_var,
             src1=size_temp,
-            comment=f"store array size for {node.name}"
+            comment=f"store array size"
         )
         self.current_block.add_instruction(store_size)
         self.var_to_temp[f"{node.name}_size"] = size_var
@@ -641,7 +705,7 @@ class IRGenerator:
                     op=OpCode.LOAD,
                     dest=self.current_function.new_temp("pointer"),
                     src1=arr_ptr,
-                    comment=f"load array {node.name}"
+                    comment=f"load array pointer"
                 )
                 self.current_block.add_instruction(load_arr)
 
@@ -650,17 +714,19 @@ class IRGenerator:
                     dest=self.current_function.new_temp("int"),
                     src1=Operand.literal(i, "int"),
                     src2=Operand.literal(4, "int"),
-                    comment=f"offset for index {i}"
+                    comment=f"offset"
                 )
                 self.current_block.add_instruction(offset)
 
-                addr = self.current_function.new_temp("pointer")
+                # ВАЖНО: адрес элемента помечаем как "address", чтобы x86_generator
+                # разыменовывал его при STORE
+                addr = self.current_function.new_temp("address")
                 gep = IRInstruction(
                     op=OpCode.ADD,
                     dest=addr,
                     src1=load_arr.dest,
                     src2=offset.dest,
-                    comment=f"address of arr[{i}]"
+                    comment=f"address of {node.name}[{i}]"
                 )
                 self.current_block.add_instruction(gep)
 
@@ -668,33 +734,40 @@ class IRGenerator:
                     op=OpCode.STORE,
                     dest=gep.dest,
                     src1=val_temp,
-                    comment=f"arr[{i}] = {val_temp}"
+                    comment=f"store element"
                 )
                 self.current_block.add_instruction(store_elem)
 
     def _generate_array_access(self, node):
         """Generate IR for array access."""
         if node.array in self.var_to_temp:
-            arr_temp = self.var_to_temp[node.array]
+            arr_ptr = self.var_to_temp[node.array]
+
+            # Load array pointer
             load_arr = IRInstruction(
                 op=OpCode.LOAD,
                 dest=self.current_function.new_temp("pointer"),
-                src1=arr_temp,
-                comment=f"load array {node.array}"
+                src1=arr_ptr,
+                comment=f"load array pointer for {node.array}"
             )
             self.current_block.add_instruction(load_arr)
-            
+
+            # Compute index
             index_temp = self._generate_expression(node.index)
+
+            # Compute offset (index * 4)
             offset = IRInstruction(
                 op=OpCode.MUL,
                 dest=self.current_function.new_temp("int"),
                 src1=index_temp,
                 src2=Operand.literal(4, "int"),
-                comment=f"index * 4"
+                comment=f"byte offset for index {index_temp}"
             )
             self.current_block.add_instruction(offset)
-            
-            addr = self.current_function.new_temp("pointer")
+
+            # ВАЖНО: адрес элемента помечаем как "address", чтобы x86_generator
+            # разыменовывал его при LOAD
+            addr = self.current_function.new_temp("address")
             gep = IRInstruction(
                 op=OpCode.ADD,
                 dest=addr,
@@ -703,7 +776,8 @@ class IRGenerator:
                 comment=f"address of {node.array}[{index_temp}]"
             )
             self.current_block.add_instruction(gep)
-            
+
+            # Load value from address
             load_val = IRInstruction(
                 op=OpCode.LOAD,
                 dest=self.current_function.new_temp("int"),
@@ -712,7 +786,7 @@ class IRGenerator:
             )
             self.current_block.add_instruction(load_val)
             return load_val.dest
-            
+
         return self.current_function.new_temp("int")
 
     def _get_type_name(self, type_obj) -> str:
@@ -732,7 +806,7 @@ class IRGenerator:
 
     def get_ir_text(self, func_name: str = None) -> str:
         """Get human-readable IR text."""
-        lines = ["# Generated IR", "#" + "=" * 50]
+        lines = ["# Generated IR", "# " + "= " * 50]
 
         if func_name:
             funcs = [(func_name, self.functions[func_name])]
@@ -756,7 +830,7 @@ class IRGenerator:
         return self.functions
 
     def generate_array_copy(self, dest_arr: str, src_arr: str, size: Operand):
-        """Generate memcpy(dest, src, size * 4)."""
+        """Generate memcpy."""
         dest_ptr = self.var_to_temp.get(dest_arr)
         src_ptr = self.var_to_temp.get(src_arr)
 

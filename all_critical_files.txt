@@ -1,0 +1,2831 @@
+from enum import Enum
+from typing import List, Optional, Any
+
+
+class NodeType(Enum):
+    PROGRAM = "program"
+    FUNCTION_DECL = "function_decl"
+    VAR_DECL = "var_decl"
+    STRUCT_DECL = "struct_decl"
+    PARAM = "param"
+    BLOCK = "block"
+    IF_STMT = "if_stmt"
+    WHILE_STMT = "while_stmt"
+    FOR_STMT = "for_stmt"
+    RETURN_STMT = "return_stmt"
+    EXPR_STMT = "expr_stmt"
+    BINARY_EXPR = "binary_expr"
+    UNARY_EXPR = "unary_expr"
+    LITERAL = "literal"
+    IDENTIFIER = "identifier"
+    CALL = "call"
+    ASSIGNMENT = "assignment"
+    ARRAY_DECL = "array_decl"
+    ARRAY_ACCESS = "array_access"
+
+
+class ASTNode:
+    def __init__(self, node_type: NodeType, line: int, column: int):
+        self.node_type = node_type
+        self.line = line
+        self.column = column
+
+
+class ProgramNode(ASTNode):
+    def __init__(self, declarations: List[ASTNode] = None, line: int = 0, column: int = 0):
+        super().__init__(NodeType.PROGRAM, line, column)
+        self.declarations = declarations or []
+
+
+class FunctionDeclNode(ASTNode):
+    def __init__(self, name: str, return_type: str, parameters: List['ParameterNode'], 
+                 body: Optional['BlockNode'], line: int, column: int, is_extern: bool = False):
+        super().__init__(NodeType.FUNCTION_DECL, line, column)
+        self.name = name
+        self.return_type = return_type
+        self.parameters = parameters
+        self.body = body
+        self.is_extern = is_extern
+
+
+class ParameterNode(ASTNode):
+    def __init__(self, name: str, param_type: str, line: int, column: int):
+        super().__init__(NodeType.PARAM, line, column)
+        self.name = name
+        self.param_type = param_type
+
+
+class VarDeclNode(ASTNode):
+    def __init__(self, var_type: str, name: str, line: int, column: int, initializer: Optional[ASTNode] = None):
+        super().__init__(NodeType.VAR_DECL, line, column)
+        self.var_type = var_type
+        self.name = name
+        self.initializer = initializer
+
+
+class ArrayDeclNode(ASTNode):
+    def __init__(self, element_type: str, name: str, size: ASTNode, line: int, column: int, 
+                 initializer: Optional[List[ASTNode]] = None):
+        super().__init__(NodeType.ARRAY_DECL, line, column)
+        self.element_type = element_type
+        self.name = name
+        self.size = size
+        self.initializer = initializer
+
+
+class ArrayAccessNode(ASTNode):
+    def __init__(self, array: str, index: ASTNode, line: int, column: int):
+        super().__init__(NodeType.ARRAY_ACCESS, line, column)
+        self.array = array
+        self.index = index
+
+
+class StructDeclNode(ASTNode):
+    def __init__(self, name: str, fields: List[VarDeclNode], line: int, column: int):
+        super().__init__(NodeType.STRUCT_DECL, line, column)
+        self.name = name
+        self.fields = fields
+
+
+class BlockNode(ASTNode):
+    def __init__(self, statements: List[ASTNode], line: int, column: int):
+        super().__init__(NodeType.BLOCK, line, column)
+        self.statements = statements
+
+
+class IfStmtNode(ASTNode):
+    def __init__(self, condition: ASTNode, then_branch: ASTNode, line: int, column: int, 
+                 else_branch: Optional[ASTNode] = None):
+        super().__init__(NodeType.IF_STMT, line, column)
+        self.condition = condition
+        self.then_branch = then_branch
+        self.else_branch = else_branch
+
+
+class WhileStmtNode(ASTNode):
+    def __init__(self, condition: ASTNode, body: ASTNode, line: int, column: int):
+        super().__init__(NodeType.WHILE_STMT, line, column)
+        self.condition = condition
+        self.body = body
+
+
+class ForStmtNode(ASTNode):
+    def __init__(self, init: Optional[ASTNode], condition: Optional[ASTNode], 
+                 update: Optional[ASTNode], body: ASTNode, line: int, column: int):
+        super().__init__(NodeType.FOR_STMT, line, column)
+        self.init = init
+        self.condition = condition
+        self.update = update
+        self.body = body
+
+
+class ReturnStmtNode(ASTNode):
+    def __init__(self, line: int, column: int, value: Optional[ASTNode] = None):
+        super().__init__(NodeType.RETURN_STMT, line, column)
+        self.value = value
+
+
+class ExprStmtNode(ASTNode):
+    def __init__(self, expression: ASTNode, line: int, column: int):
+        super().__init__(NodeType.EXPR_STMT, line, column)
+        self.expression = expression
+
+
+class BinaryExprNode(ASTNode):
+    def __init__(self, left: ASTNode, operator: str, right: ASTNode, line: int, column: int):
+        super().__init__(NodeType.BINARY_EXPR, line, column)
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+
+class UnaryExprNode(ASTNode):
+    def __init__(self, operator: str, operand: ASTNode, line: int, column: int):
+        super().__init__(NodeType.UNARY_EXPR, line, column)
+        self.operator = operator
+        self.operand = operand
+
+
+class LiteralNode(ASTNode):
+    def __init__(self, value: Any, literal_type: str, line: int, column: int):
+        super().__init__(NodeType.LITERAL, line, column)
+        self.value = value
+        self.literal_type = literal_type
+
+
+class IdentifierNode(ASTNode):
+    def __init__(self, name: str, line: int, column: int):
+        super().__init__(NodeType.IDENTIFIER, line, column)
+        self.name = name
+
+
+class CallNode(ASTNode):
+    def __init__(self, callee: str, arguments: List[ASTNode], line: int, column: int):
+        super().__init__(NodeType.CALL, line, column)
+        self.callee = callee
+        self.arguments = arguments
+
+
+class AssignmentNode(ASTNode):
+    def __init__(self, target: str, operator: str, value: ASTNode, line: int, column: int):
+        super().__init__(NodeType.ASSIGNMENT, line, column)
+        self.target = target
+        self.operator = operator
+        self.value = value
+from typing import List, Optional, Any
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.lexer.token import Token, TokenType
+from src.parser.ast import *
+
+
+class ParseError(Exception):
+    pass
+
+
+class Parser:
+    def __init__(self, tokens: List[Token]):
+        self.tokens = tokens
+        self.current = 0
+        self.errors = []
+
+    def peek(self) -> Token:
+        if self.current >= len(self.tokens):
+            return Token(TokenType.END_OF_FILE, "", -1, -1)
+        return self.tokens[self.current]
+
+    def previous(self) -> Token:
+        return self.tokens[self.current - 1]
+
+    def is_at_end(self) -> bool:
+        return self.peek().type == TokenType.END_OF_FILE
+
+    def check(self, token_type: TokenType) -> bool:
+        if self.is_at_end():
+            return False
+        return self.peek().type == token_type
+
+    def advance(self) -> Token:
+        if not self.is_at_end():
+            self.current += 1
+        return self.previous()
+
+    def match(self, *types: TokenType) -> bool:
+        for token_type in types:
+            if self.check(token_type):
+                self.advance()
+                return True
+        return False
+
+    def consume(self, token_type: TokenType, message: str) -> Token:
+        if self.check(token_type):
+            return self.advance()
+        current_token = self.peek()
+        self.errors.append(f"Строка {current_token.line}, колонка {current_token.column}: {message}")
+        return current_token
+
+    def synchronize(self):
+        self.advance()
+        while not self.is_at_end():
+            if self.previous().type == TokenType.SEMICOLON:
+                return
+            if self.peek().type in [TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL,
+                                    TokenType.KW_VOID, TokenType.KW_STRUCT, TokenType.KW_IF,
+                                    TokenType.KW_WHILE, TokenType.KW_FOR, TokenType.KW_RETURN,
+                                    TokenType.KW_FN]:
+                return
+            self.advance()
+
+    def parse(self) -> Optional[ProgramNode]:
+        try:
+            return self.parse_program()
+        except ParseError as e:
+            self.errors.append(str(e))
+            return None
+
+    def parse_program(self) -> ProgramNode:
+        declarations = []
+        line, column = 0, 0
+        if not self.is_at_end():
+            line = self.peek().line
+            column = self.peek().column
+
+        while not self.is_at_end():
+            decl = self.parse_declaration()
+            if decl:
+                declarations.append(decl)
+
+        return ProgramNode(declarations, line, column)
+
+    def parse_declaration(self) -> Optional[ASTNode]:
+        try:
+            # extern declaration
+            if self.check(TokenType.IDENTIFIER) and self.peek().lexeme == "extern":
+                self.advance()
+                return self.parse_extern_decl()
+
+            # function declaration
+            if self._is_function_declaration():
+                return self.parse_function_decl()
+
+            if self.check(TokenType.KW_STRUCT):
+                return self.parse_struct_decl()
+
+            # variable declaration
+            if self.check(TokenType.KW_INT) or self.check(TokenType.KW_FLOAT) or \
+                    self.check(TokenType.KW_BOOL) or self.check(TokenType.KW_VOID) or \
+                    self.check(TokenType.IDENTIFIER):
+                return self.parse_var_decl()
+
+            return self.parse_statement()
+
+        except ParseError as e:
+            self.errors.append(str(e))
+            self.synchronize()
+            return None
+
+    def _is_function_declaration(self) -> bool:
+        """Check if current position is a function declaration."""
+        pos = self.current
+
+        # Support 'fn' keyword
+        if self.check(TokenType.KW_FN):
+            self.current = pos
+            return True
+
+        # Standard C syntax: type identifier '('
+        if not (self.check(TokenType.KW_INT) or self.check(TokenType.KW_FLOAT) or
+                self.check(TokenType.KW_BOOL) or self.check(TokenType.KW_VOID) or
+                self.check(TokenType.IDENTIFIER)):
+            return False
+        self.advance()
+
+        if not self.check(TokenType.IDENTIFIER):
+            self.current = pos
+            return False
+        self.advance()
+
+        is_func = self.check(TokenType.LPAREN)
+        self.current = pos
+        return is_func
+
+    def parse_extern_decl(self) -> FunctionDeclNode:
+        line = self.previous().line
+        column = self.previous().column
+
+        if self.match(TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL, TokenType.KW_VOID):
+            return_type = self.previous().lexeme
+        else:
+            return_type = self.consume(TokenType.IDENTIFIER, "Expected return type").lexeme
+
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected function name")
+        name = name_token.lexeme
+
+        self.consume(TokenType.LPAREN, "Expected '('")
+        parameters = self.parse_parameters()
+        self.consume(TokenType.RPAREN, "Expected ')'")
+        self.consume(TokenType.SEMICOLON, "Expected ';'")
+
+        return FunctionDeclNode(name, return_type, parameters, None, line, column, is_extern=True)
+
+    def parse_function_decl(self) -> FunctionDeclNode:
+        line = self.peek().line
+        column = self.peek().column
+
+        # Support 'fn' keyword syntax
+        if self.match(TokenType.KW_FN):
+            name_token = self.consume(TokenType.IDENTIFIER, "Expected function name")
+            name = name_token.lexeme
+            self.consume(TokenType.LPAREN, "Expected '(' after function name")
+            parameters = self.parse_parameters()
+            self.consume(TokenType.RPAREN, "Expected ')' after parameters")
+
+            return_type = "void"
+            if self.match(TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL, TokenType.KW_VOID):
+                return_type = self.previous().lexeme
+
+            body = self.parse_block()
+            return FunctionDeclNode(name, return_type, parameters, body, line, column, is_extern=False)
+
+        # Standard C syntax
+        if self.match(TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL, TokenType.KW_VOID):
+            return_type = self.previous().lexeme
+        else:
+            return_type = self.consume(TokenType.IDENTIFIER, "Expected return type").lexeme
+
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected function name")
+        name = name_token.lexeme
+
+        self.consume(TokenType.LPAREN, "Expected '(' after function name")
+        parameters = self.parse_parameters()
+        self.consume(TokenType.RPAREN, "Expected ')' after parameters")
+
+        body = self.parse_block()
+        return FunctionDeclNode(name, return_type, parameters, body, line, column, is_extern=False)
+
+    def parse_parameters(self) -> List[ParameterNode]:
+        parameters = []
+        if self.check(TokenType.RPAREN):
+            return parameters
+
+        param = self.parse_parameter()
+        parameters.append(param)
+
+        while self.match(TokenType.COMMA):
+            param = self.parse_parameter()
+            parameters.append(param)
+
+        return parameters
+
+    def parse_parameter(self) -> ParameterNode:
+        line = self.peek().line
+        column = self.peek().column
+
+        if self.match(TokenType.ELLIPSIS):
+            return ParameterNode("...", "variadic", line, column)
+
+        # Support both C-style (int a) and Go-style (a int)
+
+        # Try C-style first: type then name
+        if self.match(TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL, TokenType.KW_VOID):
+            param_type = self.previous().lexeme
+            name_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
+            name = name_token.lexeme
+            return ParameterNode(name=name, param_type=param_type, line=line, column=column)
+
+        # Go-style: name then type
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected parameter name")
+        name = name_token.lexeme
+
+        if self.match(TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL, TokenType.KW_VOID):
+            param_type = self.previous().lexeme
+        else:
+            param_type = self.consume(TokenType.IDENTIFIER, "Expected parameter type").lexeme
+
+        return ParameterNode(name=name, param_type=param_type, line=line, column=column)
+
+    def parse_struct_decl(self) -> StructDeclNode:
+        line = self.previous().line
+        column = self.previous().column
+
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected struct name")
+        name = name_token.lexeme
+
+        self.consume(TokenType.LBRACE, "Expected '{' after struct name")
+        fields = []
+        while not self.check(TokenType.RBRACE) and not self.is_at_end():
+            field = self.parse_var_decl()
+            if field:
+                fields.append(field)
+        self.consume(TokenType.RBRACE, "Expected '}' after struct fields")
+        return StructDeclNode(name, fields, line, column)
+
+    def parse_var_decl(self) -> Optional[ASTNode]:
+        line = self.peek().line
+        column = self.peek().column
+
+        if self.match(TokenType.KW_INT, TokenType.KW_FLOAT, TokenType.KW_BOOL, TokenType.KW_VOID):
+            var_type = self.previous().lexeme
+        else:
+            var_type = self.consume(TokenType.IDENTIFIER, "Expected variable type").lexeme
+
+        name_token = self.consume(TokenType.IDENTIFIER, "Expected variable name")
+        name = name_token.lexeme
+
+        # array
+        if self.match(TokenType.LBRACKET):
+            size_expr = self.parse_expression()
+            self.consume(TokenType.RBRACKET, "Expected ']'")
+            initializer = None
+            if self.match(TokenType.ASSIGN):
+                if self.match(TokenType.LBRACE):
+                    values = []
+                    if not self.check(TokenType.RBRACE):
+                        values.append(self.parse_expression())
+                        while self.match(TokenType.COMMA):
+                            values.append(self.parse_expression())
+                    self.consume(TokenType.RBRACE, "Expected '}'")
+                    initializer = values
+                else:
+                    initializer = self.parse_expression()
+            self.consume(TokenType.SEMICOLON, "Expected ';' after array declaration")
+            return ArrayDeclNode(var_type, name, size_expr, line, column, initializer)
+
+        initializer = None
+        if self.match(TokenType.ASSIGN):
+            initializer = self.parse_expression()
+
+        self.consume(TokenType.SEMICOLON, "Expected ';' after variable declaration")
+        return VarDeclNode(var_type, name, line, column, initializer)
+
+    def parse_expression(self) -> ASTNode:
+        return self.parse_assignment()
+
+    def parse_assignment(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_logical_or()
+
+        if self.match(TokenType.ASSIGN):
+            operator = self.previous().lexeme
+            value = self.parse_assignment()
+            if isinstance(expr, IdentifierNode):
+                return AssignmentNode(expr.name, operator, value, line, column)
+            else:
+                self.errors.append(f"Line {line}, column {column}: Left side must be identifier")
+                return expr
+        return expr
+
+    def parse_logical_or(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_logical_and()
+
+        while self.match(TokenType.OR):
+            operator = self.previous().lexeme
+            right = self.parse_logical_and()
+            expr = BinaryExprNode(expr, operator, right, line, column)
+            line = self.peek().line
+            column = self.peek().column
+        return expr
+
+    def parse_logical_and(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_equality()
+
+        while self.match(TokenType.AND):
+            operator = self.previous().lexeme
+            right = self.parse_equality()
+            expr = BinaryExprNode(expr, operator, right, line, column)
+            line = self.peek().line
+            column = self.peek().column
+        return expr
+
+    def parse_equality(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_relational()
+
+        while self.match(TokenType.EQ, TokenType.NEQ):
+            operator = self.previous().lexeme
+            right = self.parse_relational()
+            expr = BinaryExprNode(expr, operator, right, line, column)
+            line = self.peek().line
+            column = self.peek().column
+        return expr
+
+    def parse_relational(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_additive()
+
+        while self.match(TokenType.LT, TokenType.LTE, TokenType.GT, TokenType.GTE):
+            operator = self.previous().lexeme
+            right = self.parse_additive()
+            expr = BinaryExprNode(expr, operator, right, line, column)
+            line = self.peek().line
+            column = self.peek().column
+        return expr
+
+    def parse_additive(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_multiplicative()
+
+        while self.match(TokenType.PLUS, TokenType.MINUS):
+            operator = self.previous().lexeme
+            right = self.parse_multiplicative()
+            expr = BinaryExprNode(expr, operator, right, line, column)
+            line = self.peek().line
+            column = self.peek().column
+        return expr
+
+    def parse_multiplicative(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_unary()
+
+        while self.match(TokenType.STAR, TokenType.SLASH, TokenType.MOD):
+            operator = self.previous().lexeme
+            right = self.parse_unary()
+            expr = BinaryExprNode(expr, operator, right, line, column)
+            line = self.peek().line
+            column = self.peek().column
+        return expr
+
+    def parse_unary(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+
+        if self.match(TokenType.MINUS):
+            operator = self.previous().lexeme
+            expr = self.parse_unary()
+            return UnaryExprNode(operator, expr, line, column)
+
+        return self.parse_primary()
+
+    def parse_primary(self) -> ASTNode:
+        line = self.peek().line
+        column = self.peek().column
+
+        if self.match(TokenType.INT_LITERAL):
+            return LiteralNode(self.previous().literal_value, "int", line, column)
+        if self.match(TokenType.FLOAT_LITERAL):
+            return LiteralNode(self.previous().literal_value, "float", line, column)
+        if self.match(TokenType.STRING_LITERAL):
+            return LiteralNode(self.previous().literal_value, "string", line, column)
+        if self.match(TokenType.KW_TRUE):
+            return LiteralNode(True, "bool", line, column)
+        if self.match(TokenType.KW_FALSE):
+            return LiteralNode(False, "bool", line, column)
+
+        if self.match(TokenType.IDENTIFIER):
+            name = self.previous().lexeme
+            if self.match(TokenType.LPAREN):
+                return self.parse_call(name, line, column)
+            if self.match(TokenType.LBRACKET):
+                index = self.parse_expression()
+                self.consume(TokenType.RBRACKET, "Expected ']'")
+                return ArrayAccessNode(name, index, line, column)
+            return IdentifierNode(name, line, column)
+
+        if self.match(TokenType.LPAREN):
+            expr = self.parse_expression()
+            self.consume(TokenType.RPAREN, "Expected ')' after expression")
+            return expr
+
+        return LiteralNode(0, "int", line, column)
+
+    def parse_call(self, callee: str, line: int, column: int) -> CallNode:
+        arguments = []
+        if not self.check(TokenType.RPAREN):
+            arguments.append(self.parse_expression())
+            while self.match(TokenType.COMMA):
+                arguments.append(self.parse_expression())
+        self.consume(TokenType.RPAREN, "Expected ')' after arguments")
+        return CallNode(callee, arguments, line, column)
+
+    def parse_statement(self) -> Optional[ASTNode]:
+        if self.check(TokenType.LBRACE):
+            return self.parse_block()
+        if self.match(TokenType.KW_IF):
+            return self.parse_if_statement()
+        if self.match(TokenType.KW_WHILE):
+            return self.parse_while_statement()
+        if self.match(TokenType.KW_FOR):
+            return self.parse_for_statement()
+        if self.match(TokenType.KW_RETURN):
+            return self.parse_return_statement()
+        if self.check(TokenType.KW_INT) or self.check(TokenType.KW_FLOAT) or \
+                self.check(TokenType.KW_BOOL) or self.check(TokenType.KW_VOID):
+            return self.parse_var_decl()
+        return self.parse_expression_statement()
+
+    def parse_block(self) -> BlockNode:
+        line = self.peek().line
+        column = self.peek().column
+        self.consume(TokenType.LBRACE, "Expected '{'")
+        statements = []
+        while not self.check(TokenType.RBRACE) and not self.is_at_end():
+            stmt = self.parse_statement()
+            if stmt:
+                statements.append(stmt)
+        self.consume(TokenType.RBRACE, "Expected '}'")
+        return BlockNode(statements, line, column)
+
+    def parse_if_statement(self) -> IfStmtNode:
+        line = self.previous().line
+        column = self.previous().column
+        self.consume(TokenType.LPAREN, "Expected '(' after 'if'")
+        condition = self.parse_expression()
+        self.consume(TokenType.RPAREN, "Expected ')' after condition")
+        then_branch = self.parse_statement()
+        else_branch = None
+        if self.match(TokenType.KW_ELSE):
+            else_branch = self.parse_statement()
+        return IfStmtNode(condition, then_branch, line, column, else_branch)
+
+    def parse_while_statement(self) -> WhileStmtNode:
+        line = self.previous().line
+        column = self.previous().column
+        self.consume(TokenType.LPAREN, "Expected '(' after 'while'")
+        condition = self.parse_expression()
+        self.consume(TokenType.RPAREN, "Expected ')' after condition")
+        body = self.parse_statement()
+        return WhileStmtNode(condition, body, line, column)
+
+    def parse_for_statement(self) -> ForStmtNode:
+        line = self.previous().line
+        column = self.previous().column
+        self.consume(TokenType.LPAREN, "Expected '(' after 'for'")
+        init = None
+        if not self.check(TokenType.SEMICOLON):
+            init = self.parse_expression_statement()
+        else:
+            self.consume(TokenType.SEMICOLON, "Expected ';'")
+        condition = None
+        if not self.check(TokenType.SEMICOLON):
+            condition = self.parse_expression()
+        self.consume(TokenType.SEMICOLON, "Expected ';' after condition")
+        update = None
+        if not self.check(TokenType.RPAREN):
+            update = self.parse_expression()
+        self.consume(TokenType.RPAREN, "Expected ')' after for header")
+        body = self.parse_statement()
+        return ForStmtNode(init, condition, update, body, line, column)
+
+    def parse_return_statement(self) -> ReturnStmtNode:
+        line = self.previous().line
+        column = self.previous().column
+        value = None
+        if not self.check(TokenType.SEMICOLON):
+            value = self.parse_expression()
+        self.consume(TokenType.SEMICOLON, "Expected ';' after return")
+        return ReturnStmtNode(line, column, value)
+
+    def parse_expression_statement(self) -> ExprStmtNode:
+        line = self.peek().line
+        column = self.peek().column
+        expr = self.parse_expression()
+        self.consume(TokenType.SEMICOLON, "Expected ';' after expression")
+        return ExprStmtNode(expr, line, column)"""Semantic analyzer that traverses AST and validates all language rules."""
+
+from typing import List, Optional
+from src.parser.ast import (
+    ProgramNode, FunctionDeclNode, VarDeclNode, StructDeclNode,
+    BlockNode, IfStmtNode, WhileStmtNode, ForStmtNode, ReturnStmtNode,
+    AssignmentNode, BinaryExprNode, UnaryExprNode, CallNode,
+    IdentifierNode, LiteralNode, ExprStmtNode, ParameterNode,
+    ArrayDeclNode, ArrayAccessNode, ASTNode
+)
+from src.semantic.symbol_table import SymbolTable, Symbol, SymbolKind
+from src.semantic.type_system import Type, BaseType, TypeSystem
+from src.semantic.errors import ErrorCollector
+
+
+class SemanticAnalyzer:
+    """SEM-1: Основной семантический анализатор."""
+
+    def __init__(self):
+        self.symbol_table = SymbolTable()
+        self.errors = ErrorCollector()
+        self.current_function: Optional[Symbol] = None
+        self.in_loop = False
+        self.decorated_ast = None
+
+    def analyze(self, ast: ProgramNode) -> bool:
+        """SEM-1: Запускает все семантические проверки."""
+        self.decorated_ast = ast
+        self.visit_program(ast)
+        return len(self.errors.errors) == 0
+
+    def get_errors(self):
+        return self.errors.errors
+
+    def get_symbol_table(self) -> SymbolTable:
+        return self.symbol_table
+
+    def get_decorated_ast(self) -> ProgramNode:
+        return self.decorated_ast
+
+    # ========== VISITOR METHODS ==========
+
+    def visit_program(self, node: ProgramNode):
+        """Обрабатывает всю программу."""
+        # ПЕРВЫЙ ПРОХОД: собираем объявления
+        for decl in node.declarations:
+            if isinstance(decl, FunctionDeclNode):
+                self._declare_function(decl)
+            elif isinstance(decl, StructDeclNode):
+                self._declare_struct(decl)
+
+        # ВТОРОЙ ПРОХОД: анализируем тела
+        for decl in node.declarations:
+            if isinstance(decl, FunctionDeclNode):
+                self.visit_function_decl(decl)
+            elif isinstance(decl, VarDeclNode):
+                self.visit_var_decl(decl)
+            elif isinstance(decl, ArrayDeclNode):
+                self.visit_array_decl(decl)
+
+    def _declare_function(self, node: FunctionDeclNode):
+        """Объявляет функцию."""
+        return_type = self._convert_type(node.return_type)
+
+        param_types = []
+        for param in node.parameters:
+            param_types.append(self._convert_type(param.param_type))
+
+        existing = self.symbol_table.lookup(node.name)
+        if existing and existing.kind == SymbolKind.FUNCTION:
+            self.errors.add(
+                node.line, node.column,
+                f"duplicate function: '{node.name}'",
+                "duplicate_declaration"
+            )
+            return
+
+        func_sym = Symbol(
+            name=node.name,
+            kind=SymbolKind.FUNCTION,
+            type=return_type,
+            line=node.line,
+            column=node.column,
+            parameters=param_types,
+            return_type=return_type
+        )
+        self.symbol_table.insert(node.name, func_sym)
+
+    def _declare_struct(self, node: StructDeclNode):
+        """Объявляет структуру."""
+        existing = self.symbol_table.lookup(node.name)
+        if existing:
+            self.errors.add(
+                node.line, node.column,
+                f"duplicate struct: '{node.name}'",
+                "duplicate_declaration"
+            )
+            return
+
+        fields = {}
+        for field in node.fields:
+            if field.name in fields:
+                self.errors.add(
+                    node.line, node.column,
+                    f"duplicate field '{field.name}'",
+                    "duplicate_declaration"
+                )
+            fields[field.name] = self._convert_type(field.var_type)
+
+        struct_type = Type(kind=node.name, is_struct=True, fields=fields)
+        struct_sym = Symbol(
+            name=node.name,
+            kind=SymbolKind.STRUCT,
+            type=struct_type,
+            line=node.line,
+            column=node.column,
+            fields=fields
+        )
+        self.symbol_table.insert(node.name, struct_sym)
+
+    def _convert_type(self, type_name: str) -> Type:
+        """Конвертирует строковый тип во внутренний."""
+        if type_name == "int":
+            return Type(BaseType.INT)
+        elif type_name == "float":
+            return Type(BaseType.FLOAT)
+        elif type_name == "bool":
+            return Type(BaseType.BOOL)
+        elif type_name == "void":
+            return Type(BaseType.VOID)
+        elif type_name == "string":
+            return Type(BaseType.STRING)
+        else:
+            # Возможно, это имя структуры
+            return Type(kind=type_name, is_struct=True)
+
+    def visit_function_decl(self, node: FunctionDeclNode):
+        """Проверяет тело функции."""
+        # Пропускаем extern функции (у них нет тела)
+        if hasattr(node, 'is_extern') and node.is_extern:
+            return
+
+        func_sym = self.symbol_table.lookup(node.name)
+        if not func_sym:
+            return
+
+        self.symbol_table.enter_scope()
+        self.current_function = func_sym
+
+        for param in node.parameters:
+            param_type = self._convert_type(param.param_type)
+            param_sym = Symbol(
+                name=param.name,
+                kind=SymbolKind.PARAMETER,
+                type=param_type,
+                line=param.line,
+                column=param.column
+            )
+            self.symbol_table.insert(param.name, param_sym)
+
+        self.visit_block(node.body)
+        self.symbol_table.exit_scope()
+        self.current_function = None
+
+    def visit_block(self, node: BlockNode):
+        """Обрабатывает блок."""
+        self.symbol_table.enter_scope()
+        for stmt in node.statements:
+            self.visit_statement(stmt)
+        self.symbol_table.exit_scope()
+
+    def visit_statement(self, node):
+        """Обрабатывает операторы."""
+        if isinstance(node, VarDeclNode):
+            self.visit_var_decl(node)
+        elif isinstance(node, ArrayDeclNode):
+            self.visit_array_decl(node)
+        elif isinstance(node, AssignmentNode):
+            self.visit_assignment(node)
+        elif isinstance(node, IfStmtNode):
+            self.visit_if(node)
+        elif isinstance(node, WhileStmtNode):
+            self.visit_while(node)
+        elif isinstance(node, ForStmtNode):
+            self.visit_for(node)
+        elif isinstance(node, ReturnStmtNode):
+            self.visit_return(node)
+        elif isinstance(node, BlockNode):
+            self.visit_block(node)
+        elif isinstance(node, CallNode):
+            self.visit_call(node)
+        elif isinstance(node, ExprStmtNode):
+            if node.expression:
+                self.visit_expression(node.expression)
+
+    def visit_array_decl(self, node: ArrayDeclNode):
+        """Проверяет объявление массива."""
+        size_type = self.visit_expression(node.size)
+
+        # Размер должен быть int
+        if size_type.kind != BaseType.INT:
+            self.errors.add_type_mismatch(
+                node.line, node.column,
+                f"array size must be integer",
+                expected="int",
+                actual=str(size_type)
+            )
+
+        element_type = self._convert_type(node.element_type)
+        array_type = Type(
+            kind=BaseType.INT,
+            is_array=True,
+            array_size=None,
+            element_type=element_type
+        )
+
+        if self.symbol_table.lookup_local(node.name):
+            self.errors.add(
+                node.line, node.column,
+                f"duplicate variable: '{node.name}'",
+                "duplicate_declaration"
+            )
+            return
+
+        var_sym = Symbol(
+            name=node.name,
+            kind=SymbolKind.VARIABLE,
+            type=array_type,
+            line=node.line,
+            column=node.column
+        )
+        self.symbol_table.insert(node.name, var_sym)
+        node.semantic_type = array_type
+        node.symbol = var_sym
+
+    def visit_array_access(self, node: ArrayAccessNode) -> Type:
+        """Проверяет доступ к элементу массива."""
+        array_sym = self.symbol_table.lookup(node.array)
+        if not array_sym:
+            self.errors.add_undeclared(node.line, node.column, node.array)
+            node.semantic_type = Type(BaseType.VOID)
+            return node.semantic_type
+
+        # Проверяем, что это массив
+        if not hasattr(array_sym.type, 'is_array') or not array_sym.type.is_array:
+            self.errors.add(
+                node.line, node.column,
+                f"'{node.array}' is not an array",
+                "type_error"
+            )
+            node.semantic_type = Type(BaseType.VOID)
+            return node.semantic_type
+
+        # Проверяем тип индекса
+        index_type = self.visit_expression(node.index)
+        if index_type.kind != BaseType.INT:
+            self.errors.add_type_mismatch(
+                node.index.line, node.index.column,
+                f"array index must be integer",
+                expected="int",
+                actual=str(index_type)
+            )
+
+        node.semantic_type = array_sym.type.element_type or Type(BaseType.INT)
+        node.array_symbol = array_sym
+        return node.semantic_type
+
+    def visit_var_decl(self, node: VarDeclNode):
+        """Проверяет объявление переменной."""
+        var_type = self._convert_type(node.var_type)
+
+        if self.symbol_table.lookup_local(node.name):
+            self.errors.add(
+                node.line, node.column,
+                f"duplicate variable: '{node.name}'",
+                "duplicate_declaration"
+            )
+            return
+
+        if node.initializer:
+            init_type = self.visit_expression(node.initializer)
+            if not TypeSystem.is_compatible(var_type, init_type):
+                self.errors.add_type_mismatch(
+                    node.line, node.column,
+                    f"cannot initialize '{node.name}'",
+                    expected=str(var_type),
+                    actual=str(init_type)
+                )
+
+        var_sym = Symbol(
+            name=node.name,
+            kind=SymbolKind.VARIABLE,
+            type=var_type,
+            line=node.line,
+            column=node.column
+        )
+        self.symbol_table.insert(node.name, var_sym)
+        node.semantic_type = var_type
+        node.symbol = var_sym
+
+    def visit_assignment(self, node: AssignmentNode):
+        """Проверяет присваивание."""
+        # Поддержка присваивания элементам массива
+        if isinstance(node.target, ArrayAccessNode):
+            target_type = self.visit_array_access(node.target)
+        elif isinstance(node.target, IdentifierNode):
+            var_sym = self.symbol_table.lookup(node.target.name)
+            if not var_sym:
+                self.errors.add_undeclared(node.target.line, node.target.column, node.target.name)
+                return
+            target_type = var_sym.type
+            node.target.symbol = var_sym
+        else:
+            target_type = self.visit_expression(node.target)
+
+        right_type = self.visit_expression(node.value)
+
+        if not TypeSystem.is_compatible(target_type, right_type):
+            self.errors.add_type_mismatch(
+                node.line, node.column,
+                "type mismatch in assignment",
+                expected=str(target_type),
+                actual=str(right_type)
+            )
+
+        node.semantic_type = target_type
+
+    def visit_expression(self, node):
+        """Определяет тип выражения."""
+        if isinstance(node, LiteralNode):
+            return self.visit_literal(node)
+        elif isinstance(node, IdentifierNode):
+            return self.visit_identifier(node)
+        elif isinstance(node, BinaryExprNode):
+            return self.visit_binary_op(node)
+        elif isinstance(node, UnaryExprNode):
+            return self.visit_unary_op(node)
+        elif isinstance(node, CallNode):
+            return self.visit_call(node)
+        elif isinstance(node, ArrayAccessNode):
+            return self.visit_array_access(node)
+        return Type(BaseType.VOID)
+
+    def visit_literal(self, node: LiteralNode) -> Type:
+        """Тип литерала."""
+        if node.literal_type == "int":
+            node.semantic_type = Type(BaseType.INT)
+        elif node.literal_type == "float":
+            node.semantic_type = Type(BaseType.FLOAT)
+        elif node.literal_type == "bool":
+            node.semantic_type = Type(BaseType.BOOL)
+        elif node.literal_type == "string":
+            node.semantic_type = Type(BaseType.STRING)
+        else:
+            node.semantic_type = Type(BaseType.VOID)
+        return node.semantic_type
+
+    def visit_identifier(self, node: IdentifierNode) -> Type:
+        """Проверяет идентификатор."""
+        sym = self.symbol_table.lookup(node.name)
+        if not sym:
+            self.errors.add_undeclared(node.line, node.column, node.name)
+            node.semantic_type = Type(BaseType.VOID)
+            return node.semantic_type
+
+        node.symbol = sym
+        node.semantic_type = sym.type
+        return sym.type
+
+    def visit_binary_op(self, node: BinaryExprNode) -> Type:
+        """Проверяет бинарную операцию."""
+        left_type = self.visit_expression(node.left)
+        right_type = self.visit_expression(node.right)
+
+        result_type = TypeSystem.binary_operator_result_type(
+            node.operator, left_type, right_type
+        )
+
+        if result_type is None:
+            self.errors.add_type_mismatch(
+                node.line, node.column,
+                f"operator '{node.operator}' cannot be applied",
+                expected="compatible types",
+                actual=f"{left_type} {node.operator} {right_type}"
+            )
+            result_type = Type(BaseType.VOID)
+
+        node.semantic_type = result_type
+        return result_type
+
+    def visit_unary_op(self, node: UnaryExprNode) -> Type:
+        """Проверяет унарную операцию."""
+        operand_type = self.visit_expression(node.operand)
+
+        result_type = TypeSystem.unary_operator_result_type(node.operator, operand_type)
+
+        if result_type is None:
+            self.errors.add_type_mismatch(
+                node.line, node.column,
+                f"operator '{node.operator}' cannot be applied to {operand_type}",
+                expected="numeric or boolean",
+                actual=str(operand_type)
+            )
+            result_type = Type(BaseType.VOID)
+
+        node.semantic_type = result_type
+        return result_type
+
+    def visit_call(self, node: CallNode) -> Type:
+        """Проверяет вызов функции. Использует node.callee вместо node.name."""
+        func_name = node.callee
+
+        func_sym = self.symbol_table.lookup(func_name)
+
+        if not func_sym or func_sym.kind != SymbolKind.FUNCTION:
+            self.errors.add(
+                node.line, node.column,
+                f"'{func_name}' is not a function",
+                "undeclared"
+            )
+            node.semantic_type = Type(BaseType.VOID)
+            return node.semantic_type
+
+        expected_count = len(func_sym.parameters) if func_sym.parameters else 0
+        actual_count = len(node.arguments)
+
+        if expected_count != actual_count:
+            self.errors.add(
+                node.line, node.column,
+                f"argument count mismatch for '{func_name}'",
+                "argument_count_mismatch",
+                details=f"expected {expected_count}, found {actual_count}"
+            )
+
+        for i, arg in enumerate(node.arguments):
+            if i >= expected_count:
+                break
+            arg_type = self.visit_expression(arg)
+            expected_type = func_sym.parameters[i]
+
+            if not TypeSystem.is_compatible(expected_type, arg_type):
+                self.errors.add_type_mismatch(
+                    arg.line, arg.column,
+                    f"argument {i + 1} of '{func_name}' has wrong type",
+                    expected=str(expected_type),
+                    actual=str(arg_type)
+                )
+
+        node.semantic_type = func_sym.return_type
+        node.function_symbol = func_sym
+        return func_sym.return_type
+
+    def visit_if(self, node: IfStmtNode):
+        """Проверяет if."""
+        cond_type = self.visit_expression(node.condition)
+        if cond_type.kind != BaseType.BOOL:
+            self.errors.add_type_mismatch(
+                node.condition.line, node.condition.column,
+                "if condition must be boolean",
+                expected="bool",
+                actual=str(cond_type)
+            )
+
+        self.visit_statement(node.then_branch)
+        if node.else_branch:
+            self.visit_statement(node.else_branch)
+
+    def visit_while(self, node: WhileStmtNode):
+        """Проверяет while."""
+        cond_type = self.visit_expression(node.condition)
+        if cond_type.kind != BaseType.BOOL:
+            self.errors.add_type_mismatch(
+                node.condition.line, node.condition.column,
+                "while condition must be boolean",
+                expected="bool",
+                actual=str(cond_type)
+            )
+
+        old_in_loop = self.in_loop
+        self.in_loop = True
+        self.visit_statement(node.body)
+        self.in_loop = old_in_loop
+
+    def visit_for(self, node: ForStmtNode):
+        """Проверяет for."""
+        if node.init:
+            self.visit_statement(node.init)
+        if node.condition:
+            cond_type = self.visit_expression(node.condition)
+            if cond_type.kind != BaseType.BOOL:
+                self.errors.add_type_mismatch(
+                    node.condition.line, node.condition.column,
+                    "for condition must be boolean",
+                    expected="bool",
+                    actual=str(cond_type)
+                )
+        if node.update:
+            self.visit_expression(node.update)
+
+        old_in_loop = self.in_loop
+        self.in_loop = True
+        self.visit_statement(node.body)
+        self.in_loop = old_in_loop
+
+    def visit_return(self, node: ReturnStmtNode):
+        """Проверяет return."""
+        if not self.current_function:
+            self.errors.add(
+                node.line, node.column,
+                "return outside function",
+                "invalid_return"
+            )
+            return
+
+        expected_type = self.current_function.return_type
+
+        if node.value:
+            actual_type = self.visit_expression(node.value)
+            if not TypeSystem.is_compatible(expected_type, actual_type):
+                self.errors.add_type_mismatch(
+                    node.line, node.column,
+                    f"return type mismatch in '{self.current_function.name}'",
+                    expected=str(expected_type),
+                    actual=str(actual_type)
+                )
+            node.semantic_type = actual_type
+        else:
+            if expected_type.kind != BaseType.VOID:
+                self.errors.add(
+                    node.line, node.column,
+                    f"non-void function must return a value",
+                    "invalid_return"
+                )
+            node.semantic_type = Type(BaseType.VOID)
+
+    def print_symbol_table(self):
+        """Выводит таблицу символов."""
+        print(self.symbol_table.dump())
+
+    def print_errors(self):
+        """Выводит ошибки."""
+        for error in self.errors.errors:
+            print(error)"""Type system for semantic analysis."""
+
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
+from enum import Enum
+
+
+class BaseType(Enum):
+    """Base types for the language."""
+    INT = "int"
+    FLOAT = "float"
+    BOOL = "bool"
+    VOID = "void"
+    STRING = "string"
+
+
+@dataclass
+class Type:
+    """Type representation."""
+    kind: Union[BaseType, str]
+    is_struct: bool = False
+    fields: Optional[Dict[str, 'Type']] = None
+    is_array: bool = False
+    array_size: Optional[int] = None
+    element_type: Optional['Type'] = None
+
+    def __str__(self) -> str:
+        if self.is_struct:
+            return f"struct {self.kind}"
+        elif self.is_array:
+            return f"array[{self.array_size}] of {self.element_type}"
+        return self.kind.value if isinstance(self.kind, BaseType) else str(self.kind)
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Type):
+            return False
+
+        if not self.is_struct and not other.is_struct:
+            return self.kind == other.kind
+
+        if self.is_struct and other.is_struct:
+            return self.kind == other.kind
+
+        return False
+
+    def size_bytes(self) -> int:
+        """Return size in bytes for memory layout."""
+        if self.kind == BaseType.INT:
+            return 4
+        elif self.kind == BaseType.FLOAT:
+            return 4
+        elif self.kind == BaseType.BOOL:
+            return 1
+        elif self.kind == BaseType.VOID:
+            return 0
+        elif self.is_struct and self.fields:
+            total = 0
+            for field_type in self.fields.values():
+                total += field_type.size_bytes()
+            return total
+        elif self.is_array:
+            return self.array_size * self.element_type.size_bytes()
+        return 0
+
+
+class TypeSystem:
+    """Type operations and compatibility checking."""
+
+    @staticmethod
+    def is_compatible(target: Type, source: Type) -> bool:
+        """Check if source type can be assigned to target type.
+        Allows implicit widening: int -> float.
+        """
+        # Exact match
+        if target == source:
+            return True
+
+        # Implicit widening: int to float
+        if (target.kind == BaseType.FLOAT and source.kind == BaseType.INT):
+            return True
+
+        # Struct types: must be same struct name
+        if target.is_struct and source.is_struct:
+            return target.kind == source.kind
+
+        return False
+
+    @staticmethod
+    def can_convert(source: Type, target: Type) -> bool:
+        """Check if source can be converted to target."""
+        # Exact match
+        if source == target:
+            return True
+
+        # int -> float (widening)
+        if source.kind == BaseType.INT and target.kind == BaseType.FLOAT:
+            return True
+
+        # Any type can be used as bool (for conditions)
+        if target.kind == BaseType.BOOL:
+            return True
+
+        return False
+
+    @staticmethod
+    def binary_operator_result_type(op: str, left: Type, right: Type) -> Optional[Type]:
+        """Determine result type of binary operation."""
+        # Arithmetic operators: + - * / %
+        if op in ['+', '-', '*', '/', '%']:
+            # int + int = int
+            if left.kind == BaseType.INT and right.kind == BaseType.INT:
+                return Type(BaseType.INT)
+
+            # float + anything = float (if both are numeric)
+            if (left.kind in [BaseType.INT, BaseType.FLOAT] and
+                    right.kind in [BaseType.INT, BaseType.FLOAT]):
+                return Type(BaseType.FLOAT)
+
+            return None
+
+        # Comparison operators: == != < <= > >=
+        elif op in ['==', '!=', '<', '<=', '>', '>=']:
+            if TypeSystem.is_compatible(left, right) or TypeSystem.is_compatible(right, left):
+                return Type(BaseType.BOOL)
+            return None
+
+        # Logical operators: && ||
+        elif op in ['&&', '||']:
+            if left.kind == BaseType.BOOL and right.kind == BaseType.BOOL:
+                return Type(BaseType.BOOL)
+            return None
+
+        return None"""Symbol table implementation for semantic analysis."""
+
+from enum import Enum
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field
+
+# Импорт типов из type_system
+from src.semantic.type_system import Type, BaseType
+
+
+class SymbolKind(Enum):
+    """SYM-3: Types of symbols."""
+    VARIABLE = "variable"
+    FUNCTION = "function"
+    PARAMETER = "parameter"
+    STRUCT = "struct"
+    FIELD = "field"
+
+
+@dataclass
+class Symbol:
+    """SYM-3: Symbol information for each identifier."""
+    name: str
+    kind: SymbolKind
+    type: Type
+    line: int
+    column: int
+
+    # Optional fields for functions
+    parameters: Optional[List[Type]] = None
+    return_type: Optional[Type] = None
+
+    # Optional fields for structs
+    fields: Optional[Dict[str, Type]] = None
+
+    # For future code generation
+    stack_offset: Optional[int] = None
+    size_bytes: Optional[int] = None
+
+
+class SymbolTable:
+    """SYM-1: Hierarchical symbol table with scope management."""
+
+    def __init__(self):
+        """SYM-1: Constructor creates global scope."""
+        self.scopes: List[Dict[str, Symbol]] = [{}]
+        self.current_scope_index = 0
+
+    def enter_scope(self) -> None:
+        """SYM-1: Push new nested scope."""
+        self.scopes.append({})
+        self.current_scope_index += 1
+
+    def exit_scope(self) -> None:
+        """SYM-1: Pop current scope."""
+        if len(self.scopes) > 1:
+            self.scopes.pop()
+            self.current_scope_index -= 1
+
+    def insert(self, name: str, symbol: Symbol) -> bool:
+        """SYM-1: Insert symbol into current scope.
+        Returns True if successful, False if duplicate.
+        """
+        current_scope = self.scopes[-1]
+        if name in current_scope:
+            return False
+        current_scope[name] = symbol
+        return True
+
+    def lookup(self, name: str) -> Optional[Symbol]:
+        """SYM-1: Search from current to outer scopes."""
+        for i in range(len(self.scopes) - 1, -1, -1):
+            if name in self.scopes[i]:
+                return self.scopes[i][name]
+        return None
+
+    def lookup_local(self, name: str) -> Optional[Symbol]:
+        """SYM-1: Search only current scope."""
+        return self.scopes[-1].get(name)
+
+    def get_current_scope_depth(self) -> int:
+        """SYM-2: Return current nesting depth."""
+        return len(self.scopes) - 1
+
+    def dump(self) -> str:
+        """Produce readable symbol table dump."""
+        result = []
+        for i, scope in enumerate(self.scopes):
+            scope_name = "Global (scope 0)" if i == 0 else f"Scope {i}"
+            result.append(f"\n{scope_name}:")
+            if not scope:
+                result.append("  (empty)")
+            for name, sym in scope.items():
+                type_str = str(sym.type) if sym.type else "unknown"
+                result.append(f"  - {name}: {sym.kind.value} -> {type_str} (line {sym.line})")
+                if sym.kind == SymbolKind.FUNCTION and sym.parameters:
+                    params = ", ".join(str(p) for p in sym.parameters)
+                    result.append(f"      parameters: ({params})")
+                    result.append(f"      returns: {sym.return_type}")
+                elif sym.kind == SymbolKind.STRUCT and sym.fields:
+                    for fname, ftype in sym.fields.items():
+                        result.append(f"      field {fname}: {ftype}")
+        return "\n".join(result)"""IR Generator - traverses decorated AST and produces Intermediate Representation."""
+
+from typing import Dict, List, Optional, Any
+from src.parser.ast import (
+    ProgramNode, FunctionDeclNode, VarDeclNode, StructDeclNode,
+    BlockNode, IfStmtNode, WhileStmtNode, ForStmtNode, ReturnStmtNode,
+    AssignmentNode, BinaryExprNode, UnaryExprNode, CallNode,
+    IdentifierNode, LiteralNode, ExprStmtNode, ParameterNode, ArrayDeclNode, ArrayAccessNode
+)
+from src.semantic.symbol_table import SymbolTable, Symbol
+from src.semantic.type_system import Type, BaseType
+
+from .ir_instructions import (
+    IRInstruction, IRFunction, Operand, OpCode, OperandType
+)
+from .basic_block import BasicBlock, ControlFlowGraph, BlockType
+
+
+class IRGenerator:
+    """Generates IR from decorated AST."""
+
+    def __init__(self, symbol_table: SymbolTable):
+        self.symbol_table = symbol_table
+        self.functions: Dict[str, IRFunction] = {}
+        self.current_function: Optional[IRFunction] = None
+        self.current_block: Optional[BasicBlock] = None
+        self.var_to_temp: Dict[str, Operand] = {}
+        self.temp_counter = 0
+
+    def generate(self, ast: ProgramNode) -> Dict[str, IRFunction]:
+        """Generate IR for entire program."""
+        for decl in ast.declarations:
+            if isinstance(decl, FunctionDeclNode):
+                self._generate_function(decl)
+        return self.functions
+
+    def _generate_function(self, node: FunctionDeclNode) -> IRFunction:
+        """Generate IR for a single function."""
+        if node.body is None:
+            ir_func = IRFunction(
+                name=node.name,
+                return_type=node.return_type,
+                parameters=[(p.name, p.param_type) for p in node.parameters],
+                blocks=[],
+                entry_block=None,
+                next_temp_id=0,
+                next_label_id=0
+            )
+            self.functions[node.name] = ir_func
+            return ir_func
+
+        ir_func = IRFunction(
+            name=node.name,
+            return_type=node.return_type,
+            parameters=[(p.name, p.param_type) for p in node.parameters],
+            blocks=[],
+            entry_block=None,
+            next_temp_id=0,
+            next_label_id=0
+        )
+        self.current_function = ir_func
+        self.var_to_temp = {}
+
+        entry_block = BasicBlock(label=ir_func.new_label())
+        self.current_block = entry_block
+        ir_func.blocks.append(entry_block)
+
+        # Map parameters to temporaries and load from registers
+        for i, (param_name, param_type) in enumerate(ir_func.parameters):
+            temp = ir_func.new_temp(param_type)
+            self.var_to_temp[param_name] = temp
+
+            # Load parameter from register (rdi for first, rsi for second)
+            if i == 0:
+                param_reg = Operand.var("rdi", param_type)
+            elif i == 1:
+                param_reg = Operand.var("rsi", param_type)
+            else:
+                param_reg = Operand.literal(0, param_type)
+
+            load_instr = IRInstruction(
+                op=OpCode.LOAD,
+                dest=temp,
+                src1=param_reg,
+                comment=f"load parameter {param_name}"
+            )
+            self.current_block.add_instruction(load_instr)
+
+        self._generate_block(node.body)
+
+        # Add implicit return if needed
+        if self.current_block and self.current_block.instructions:
+            last_instr = self.current_block.instructions[-1]
+            if last_instr.op != OpCode.RETURN:
+                if node.return_type == "void":
+                    ret_instr = IRInstruction(op=OpCode.RETURN)
+                    self.current_block.add_instruction(ret_instr)
+                else:
+                    zero = Operand.literal(0, "int")
+                    ret_instr = IRInstruction(op=OpCode.RETURN, dest=zero)
+                    self.current_block.add_instruction(ret_instr)
+
+        ir_func.entry_block = entry_block
+        self.functions[node.name] = ir_func
+        self.current_function = None
+
+        return ir_func
+
+    def _generate_block(self, node: BlockNode):
+        """Generate IR for a block statement."""
+        if node is None:
+            return
+        for stmt in node.statements:
+            self._generate_statement(stmt)
+
+    def _generate_statement(self, node):
+        """Dispatch to appropriate statement handler."""
+        if node is None:
+            return
+        if isinstance(node, VarDeclNode):
+            self._generate_var_decl(node)
+        elif isinstance(node, AssignmentNode):
+            self._generate_assignment(node)
+        elif isinstance(node, IfStmtNode):
+            self._generate_if(node)
+        elif isinstance(node, WhileStmtNode):
+            self._generate_while(node)
+        elif isinstance(node, ForStmtNode):
+            self._generate_for(node)
+        elif isinstance(node, ReturnStmtNode):
+            self._generate_return(node)
+        elif isinstance(node, BlockNode):
+            self._generate_block(node)
+        elif isinstance(node, ExprStmtNode):
+            if node.expression:
+                self._generate_expression(node.expression)
+        elif isinstance(node, CallNode):
+            self._generate_call(node)
+        elif isinstance(node, ArrayDeclNode):
+            self._generate_array_decl(node)
+
+    def _generate_var_decl(self, node: VarDeclNode):
+        """Generate IR for variable declaration."""
+        temp = self.current_function.new_temp(node.var_type)
+        self.var_to_temp[node.name] = temp
+
+        if node.initializer:
+            init_temp = self._generate_expression(node.initializer)
+            store_instr = IRInstruction(
+                op=OpCode.STORE,
+                dest=temp,
+                src1=init_temp,
+                comment=f"init {node.name}"
+            )
+            self.current_block.add_instruction(store_instr)
+
+    def _generate_assignment(self, node: AssignmentNode):
+        """Generate IR for assignment - handles array elements."""
+        if isinstance(node.target, ArrayAccessNode):
+            self._generate_array_assignment(node.target, node.value)
+            return
+
+        if node.target in self.var_to_temp:
+            target_temp = self.var_to_temp[node.target]
+        else:
+            target_temp = self.current_function.new_temp("int")
+            self.var_to_temp[node.target] = target_temp
+
+        rhs_temp = self._generate_expression(node.value)
+
+        store_instr = IRInstruction(
+            op=OpCode.STORE,
+            dest=target_temp,
+            src1=rhs_temp,
+            comment=f"assign {node.target}"
+        )
+        self.current_block.add_instruction(store_instr)
+
+    def _generate_array_assignment(self, array_access: ArrayAccessNode, value_node):
+        """Generate IR for array element assignment."""
+        if array_access.array in self.var_to_temp:
+            arr_ptr = self.var_to_temp[array_access.array]
+
+            load_arr = IRInstruction(
+                op=OpCode.LOAD,
+                dest=self.current_function.new_temp("pointer"),
+                src1=arr_ptr,
+                comment=f"load array {array_access.array} pointer"
+            )
+            self.current_block.add_instruction(load_arr)
+
+            index_temp = self._generate_expression(array_access.index)
+            offset = IRInstruction(
+                op=OpCode.MUL,
+                dest=self.current_function.new_temp("int"),
+                src1=index_temp,
+                src2=Operand.literal(4, "int"),
+                comment=f"byte offset"
+            )
+            self.current_block.add_instruction(offset)
+
+            addr = self.current_function.new_temp("pointer")
+            gep = IRInstruction(
+                op=OpCode.ADD,
+                dest=addr,
+                src1=load_arr.dest,
+                src2=offset.dest,
+                comment=f"address"
+            )
+            self.current_block.add_instruction(gep)
+
+            rhs_temp = self._generate_expression(value_node)
+
+            store_elem = IRInstruction(
+                op=OpCode.STORE,
+                dest=gep.dest,
+                src1=rhs_temp,
+                comment=f"store"
+            )
+            self.current_block.add_instruction(store_elem)
+
+    def _generate_expression(self, node) -> Operand:
+        """Generate IR for expression and return result temp."""
+        if node is None:
+            return Operand.literal(0, "int")
+        if isinstance(node, LiteralNode):
+            return self._generate_literal(node)
+        elif isinstance(node, IdentifierNode):
+            return self._generate_identifier(node)
+        elif isinstance(node, BinaryExprNode):
+            return self._generate_binary_op(node)
+        elif isinstance(node, UnaryExprNode):
+            return self._generate_unary_op(node)
+        elif isinstance(node, CallNode):
+            return self._generate_call(node)
+        elif isinstance(node, ArrayAccessNode):
+            return self._generate_array_access(node)
+        else:
+            return Operand.literal(0, "int")
+
+    def _generate_literal(self, node: LiteralNode) -> Operand:
+        """Generate IR for literal."""
+        if node.literal_type == "int":
+            return Operand.literal(int(node.value), "int")
+        elif node.literal_type == "float":
+            return Operand.literal(float(node.value), "float")
+        elif node.literal_type == "bool":
+            return Operand.literal(node.value == "true", "bool")
+        elif node.literal_type == "string":
+            return Operand.var(str(node.value), "string")
+        return Operand.literal(0, "int")
+
+    def _generate_identifier(self, node: IdentifierNode) -> Operand:
+        """Generate IR for identifier (load variable)."""
+        if node.name in self.var_to_temp:
+            temp = self.var_to_temp[node.name]
+            load_instr = IRInstruction(
+                op=OpCode.LOAD,
+                dest=self.current_function.new_temp("int"),
+                src1=temp,
+                comment=f"load {node.name}"
+            )
+            self.current_block.add_instruction(load_instr)
+            return load_instr.dest
+        else:
+            return self.current_function.new_temp("int")
+
+    def _generate_binary_op(self, node: BinaryExprNode) -> Operand:
+        """Generate IR for binary operation."""
+        from src.parser.ast import LiteralNode
+
+        left_is_const = isinstance(node.left, LiteralNode)
+        right_is_const = isinstance(node.right, LiteralNode)
+
+        if left_is_const and right_is_const:
+            left_val = node.left.value
+            right_val = node.right.value
+            op = node.operator
+
+            try:
+                if op == '+':
+                    result = left_val + right_val
+                elif op == '-':
+                    result = left_val - right_val
+                elif op == '*':
+                    result = left_val * right_val
+                elif op == '/':
+                    if right_val == 0:
+                        return None
+                    result = left_val // right_val
+                elif op == '%':
+                    if right_val == 0:
+                        return None
+                    result = left_val % right_val
+                else:
+                    pass
+                return Operand.literal(result, "int")
+            except:
+                pass
+
+        if node.operator == '&&':
+            return self._generate_logical_and(node)
+        elif node.operator == '||':
+            return self._generate_logical_or(node)
+
+        left_temp = self._generate_expression(node.left)
+        right_temp = self._generate_expression(node.right)
+
+        op_map = {
+            '+': OpCode.ADD,
+            '-': OpCode.SUB,
+            '*': OpCode.MUL,
+            '/': OpCode.DIV,
+            '%': OpCode.MOD,
+            '==': OpCode.CMP_EQ,
+            '!=': OpCode.CMP_NE,
+            '<': OpCode.CMP_LT,
+            '<=': OpCode.CMP_LE,
+            '>': OpCode.CMP_GT,
+            '>=': OpCode.CMP_GE,
+        }
+
+        opcode = op_map.get(node.operator, OpCode.ADD)
+        result_temp = self.current_function.new_temp("int")
+
+        instr = IRInstruction(
+            op=opcode,
+            dest=result_temp,
+            src1=left_temp,
+            src2=right_temp,
+            comment=f"{left_temp} {node.operator} {right_temp}"
+        )
+        self.current_block.add_instruction(instr)
+
+        return result_temp
+
+    def _generate_logical_and(self, node: BinaryExprNode) -> Operand:
+        """Generate short-circuit AND."""
+        result = self.current_function.new_temp("bool")
+
+        false_label = self.current_function.new_label()
+        end_label = self.current_function.new_label()
+
+        left_val = self._generate_expression(node.left)
+
+        jump_if_false = IRInstruction(
+            op=OpCode.JUMP_IF_NOT,
+            dest=left_val,
+            src1=false_label
+        )
+        self.current_block.add_instruction(jump_if_false)
+
+        right_val = self._generate_expression(node.right)
+
+        jump_if_false2 = IRInstruction(
+            op=OpCode.JUMP_IF_NOT,
+            dest=right_val,
+            src1=false_label
+        )
+        self.current_block.add_instruction(jump_if_false2)
+
+        store_true = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(1, "bool")
+        )
+        self.current_block.add_instruction(store_true)
+
+        jump_to_end = IRInstruction(
+            op=OpCode.JUMP,
+            src1=end_label
+        )
+        self.current_block.add_instruction(jump_to_end)
+
+        false_block = BasicBlock(label=false_label)
+        self.current_function.blocks.append(false_block)
+        self.current_block = false_block
+
+        store_false = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(0, "bool")
+        )
+        self.current_block.add_instruction(store_false)
+
+        end_block = BasicBlock(label=end_label)
+        self.current_function.blocks.append(end_block)
+        self.current_block = end_block
+
+        return result
+
+    def _generate_logical_or(self, node: BinaryExprNode) -> Operand:
+        """Generate short-circuit OR."""
+        result = self.current_function.new_temp("bool")
+
+        true_label = self.current_function.new_label()
+        end_label = self.current_function.new_label()
+
+        left_val = self._generate_expression(node.left)
+
+        jump_if_true = IRInstruction(
+            op=OpCode.JUMP_IF,
+            dest=left_val,
+            src1=true_label
+        )
+        self.current_block.add_instruction(jump_if_true)
+
+        right_val = self._generate_expression(node.right)
+
+        jump_if_true2 = IRInstruction(
+            op=OpCode.JUMP_IF,
+            dest=right_val,
+            src1=true_label
+        )
+        self.current_block.add_instruction(jump_if_true2)
+
+        store_false = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(0, "bool")
+        )
+        self.current_block.add_instruction(store_false)
+
+        jump_to_end = IRInstruction(
+            op=OpCode.JUMP,
+            src1=end_label
+        )
+        self.current_block.add_instruction(jump_to_end)
+
+        true_block = BasicBlock(label=true_label)
+        self.current_function.blocks.append(true_block)
+        self.current_block = true_block
+
+        store_true = IRInstruction(
+            op=OpCode.STORE,
+            dest=result,
+            src1=Operand.literal(1, "bool")
+        )
+        self.current_block.add_instruction(store_true)
+
+        end_block = BasicBlock(label=end_label)
+        self.current_function.blocks.append(end_block)
+        self.current_block = end_block
+
+        return result
+
+    def _generate_unary_op(self, node: UnaryExprNode) -> Operand:
+        """Generate IR for unary operation."""
+        operand_temp = self._generate_expression(node.operand)
+
+        if node.operator == '-':
+            result_temp = self.current_function.new_temp("int")
+            instr = IRInstruction(
+                op=OpCode.NEG,
+                dest=result_temp,
+                src1=operand_temp,
+                comment=f"-{operand_temp}"
+            )
+            self.current_block.add_instruction(instr)
+            return result_temp
+        elif node.operator == '!':
+            result_temp = self.current_function.new_temp("bool")
+            instr = IRInstruction(
+                op=OpCode.NOT,
+                dest=result_temp,
+                src1=operand_temp,
+                comment=f"!{operand_temp}"
+            )
+            self.current_block.add_instruction(instr)
+            return result_temp
+        else:
+            return operand_temp
+
+    def _generate_return(self, node: ReturnStmtNode):
+        """Generate IR for return statement."""
+        if node.value:
+            value_temp = self._generate_expression(node.value)
+            ret_instr = IRInstruction(op=OpCode.RETURN, dest=value_temp)
+        else:
+            ret_instr = IRInstruction(op=OpCode.RETURN)
+
+        self.current_block.add_instruction(ret_instr)
+
+    def _generate_if(self, node: IfStmtNode):
+        """Generate IR for if statement."""
+        cond_temp = self._generate_expression(node.condition)
+
+        then_label = self.current_function.new_label()
+        else_label = self.current_function.new_label()
+        merge_label = self.current_function.new_label()
+
+        jump_if_instr = IRInstruction(
+            op=OpCode.JUMP_IF,
+            dest=cond_temp,
+            src1=then_label,
+            comment="if condition true"
+        )
+        self.current_block.add_instruction(jump_if_instr)
+
+        jump_to_else = IRInstruction(
+            op=OpCode.JUMP,
+            src1=else_label
+        )
+        self.current_block.add_instruction(jump_to_else)
+
+        then_block = BasicBlock(label=then_label)
+        self.current_function.blocks.append(then_block)
+        self.current_block = then_block
+        self._generate_statement(node.then_branch)
+        if not self.current_block.is_terminated():
+            jump_to_merge = IRInstruction(op=OpCode.JUMP, src1=merge_label)
+            self.current_block.add_instruction(jump_to_merge)
+
+        else_block = BasicBlock(label=else_label)
+        self.current_function.blocks.append(else_block)
+        self.current_block = else_block
+        if node.else_branch:
+            self._generate_statement(node.else_branch)
+        if not self.current_block.is_terminated():
+            jump_to_merge = IRInstruction(op=OpCode.JUMP, src1=merge_label)
+            self.current_block.add_instruction(jump_to_merge)
+
+        merge_block = BasicBlock(label=merge_label)
+        self.current_function.blocks.append(merge_block)
+        self.current_block = merge_block
+
+    def _generate_while(self, node: WhileStmtNode):
+        """Generate IR for while loop."""
+        header_label = self.current_function.new_label()
+        body_label = self.current_function.new_label()
+        exit_label = self.current_function.new_label()
+
+        jump_to_header = IRInstruction(op=OpCode.JUMP, src1=header_label)
+        self.current_block.add_instruction(jump_to_header)
+
+        header_block = BasicBlock(label=header_label)
+        self.current_function.blocks.append(header_block)
+        self.current_block = header_block
+
+        cond_temp = self._generate_expression(node.condition)
+
+        jump_if_instr = IRInstruction(
+            op=OpCode.JUMP_IF,
+            dest=cond_temp,
+            src1=body_label,
+            comment="while condition true"
+        )
+        self.current_block.add_instruction(jump_if_instr)
+
+        jump_to_exit = IRInstruction(op=OpCode.JUMP, src1=exit_label)
+        self.current_block.add_instruction(jump_to_exit)
+
+        body_block = BasicBlock(label=body_label)
+        self.current_function.blocks.append(body_block)
+        self.current_block = body_block
+
+        self._generate_statement(node.body)
+
+        if not self.current_block.is_terminated():
+            jump_back = IRInstruction(op=OpCode.JUMP, src1=header_label)
+            self.current_block.add_instruction(jump_back)
+
+        exit_block = BasicBlock(label=exit_label)
+        self.current_function.blocks.append(exit_block)
+        self.current_block = exit_block
+
+    def _generate_for(self, node: ForStmtNode):
+        """Generate IR for for loop."""
+        if node.init:
+            self._generate_statement(node.init)
+
+        header_label = self.current_function.new_label()
+        body_label = self.current_function.new_label()
+        increment_label = self.current_function.new_label()
+        exit_label = self.current_function.new_label()
+
+        jump_to_header = IRInstruction(op=OpCode.JUMP, src1=header_label)
+        self.current_block.add_instruction(jump_to_header)
+
+        header_block = BasicBlock(label=header_label)
+        self.current_function.blocks.append(header_block)
+        self.current_block = header_block
+
+        if node.condition:
+            cond_temp = self._generate_expression(node.condition)
+            jump_if_instr = IRInstruction(
+                op=OpCode.JUMP_IF,
+                dest=cond_temp,
+                src1=body_label,
+                comment="for condition true"
+            )
+            self.current_block.add_instruction(jump_if_instr)
+        else:
+            jump_if_instr = IRInstruction(op=OpCode.JUMP, src1=body_label)
+            self.current_block.add_instruction(jump_if_instr)
+
+        jump_to_exit = IRInstruction(op=OpCode.JUMP, src1=exit_label)
+        self.current_block.add_instruction(jump_to_exit)
+
+        body_block = BasicBlock(label=body_label)
+        self.current_function.blocks.append(body_block)
+        self.current_block = body_block
+
+        self._generate_statement(node.body)
+
+        if not self.current_block.is_terminated():
+            jump_to_inc = IRInstruction(op=OpCode.JUMP, src1=increment_label)
+            self.current_block.add_instruction(jump_to_inc)
+
+        increment_block = BasicBlock(label=increment_label)
+        self.current_function.blocks.append(increment_block)
+        self.current_block = increment_block
+
+        if node.update:
+            self._generate_expression(node.update)
+
+        jump_back = IRInstruction(op=OpCode.JUMP, src1=header_label)
+        self.current_block.add_instruction(jump_back)
+
+        exit_block = BasicBlock(label=exit_label)
+        self.current_function.blocks.append(exit_block)
+        self.current_block = exit_block
+
+    def _generate_call(self, node: CallNode) -> Operand:
+        """Generate IR for function call."""
+        result_temp = self.current_function.new_temp("int")
+
+        arg_temps = []
+        for arg in node.arguments:
+            arg_temp = self._generate_expression(arg)
+            arg_temps.append(arg_temp)
+
+        call_instr = IRInstruction(
+            op=OpCode.CALL,
+            dest=result_temp,
+            src1=Operand.var(node.callee, "function"),
+            src2=arg_temps[0] if len(arg_temps) > 0 else None,
+            src3=arg_temps[1] if len(arg_temps) > 1 else None,
+            comment=f"call {node.callee}"
+        )
+        self.current_block.add_instruction(call_instr)
+        return result_temp
+
+    def _generate_array_decl(self, node):
+        """Generate IR for array declaration."""
+        size_temp = self._generate_expression(node.size)
+        mul_instr = IRInstruction(
+            op=OpCode.MUL,
+            dest=self.current_function.new_temp("int"),
+            src1=size_temp,
+            src2=Operand.literal(4, "int"),
+            comment=f"array size in bytes"
+        )
+        self.current_block.add_instruction(mul_instr)
+        bytes_count = mul_instr.dest
+
+        call_malloc = IRInstruction(
+            op=OpCode.CALL,
+            dest=self.current_function.new_temp("pointer"),
+            src1=Operand.var("malloc", "function"),
+            src2=bytes_count,
+            comment=f"malloc for array {node.name}"
+        )
+        self.current_block.add_instruction(call_malloc)
+
+        arr_ptr = self.current_function.new_temp("pointer")
+        store_ptr = IRInstruction(
+            op=OpCode.STORE,
+            dest=arr_ptr,
+            src1=call_malloc.dest,
+            comment=f"store array pointer"
+        )
+        self.current_block.add_instruction(store_ptr)
+        self.var_to_temp[node.name] = arr_ptr
+
+        size_var = self.current_function.new_temp("int")
+        store_size = IRInstruction(
+            op=OpCode.STORE,
+            dest=size_var,
+            src1=size_temp,
+            comment=f"store array size"
+        )
+        self.current_block.add_instruction(store_size)
+        self.var_to_temp[f"{node.name}_size"] = size_var
+
+        if node.initializer and isinstance(node.initializer, list):
+            for i, init_expr in enumerate(node.initializer):
+                val_temp = self._generate_expression(init_expr)
+
+                load_arr = IRInstruction(
+                    op=OpCode.LOAD,
+                    dest=self.current_function.new_temp("pointer"),
+                    src1=arr_ptr,
+                    comment=f"load array"
+                )
+                self.current_block.add_instruction(load_arr)
+
+                offset = IRInstruction(
+                    op=OpCode.MUL,
+                    dest=self.current_function.new_temp("int"),
+                    src1=Operand.literal(i, "int"),
+                    src2=Operand.literal(4, "int"),
+                    comment=f"offset"
+                )
+                self.current_block.add_instruction(offset)
+
+                addr = self.current_function.new_temp("pointer")
+                gep = IRInstruction(
+                    op=OpCode.ADD,
+                    dest=addr,
+                    src1=load_arr.dest,
+                    src2=offset.dest,
+                    comment=f"address"
+                )
+                self.current_block.add_instruction(gep)
+
+                store_elem = IRInstruction(
+                    op=OpCode.STORE,
+                    dest=gep.dest,
+                    src1=val_temp,
+                    comment=f"store element"
+                )
+                self.current_block.add_instruction(store_elem)
+
+    def _generate_array_access(self, node):
+        """Generate IR for array access."""
+        if node.array in self.var_to_temp:
+            arr_ptr = self.var_to_temp[node.array]
+
+            load_arr = IRInstruction(
+                op=OpCode.LOAD,
+                dest=self.current_function.new_temp("pointer"),
+                src1=arr_ptr,
+                comment=f"load array pointer"
+            )
+            self.current_block.add_instruction(load_arr)
+
+            index_temp = self._generate_expression(node.index)
+            offset = IRInstruction(
+                op=OpCode.MUL,
+                dest=self.current_function.new_temp("int"),
+                src1=index_temp,
+                src2=Operand.literal(4, "int"),
+                comment=f"byte offset"
+            )
+            self.current_block.add_instruction(offset)
+
+            addr = self.current_function.new_temp("pointer")
+            gep = IRInstruction(
+                op=OpCode.ADD,
+                dest=addr,
+                src1=load_arr.dest,
+                src2=offset.dest,
+                comment=f"address"
+            )
+            self.current_block.add_instruction(gep)
+
+            load_val = IRInstruction(
+                op=OpCode.LOAD,
+                dest=self.current_function.new_temp("int"),
+                src1=gep.dest,
+                comment=f"load value"
+            )
+            self.current_block.add_instruction(load_val)
+            return load_val.dest
+
+        return self.current_function.new_temp("int")
+
+    def _get_type_name(self, type_obj) -> str:
+        """Convert type object to string name."""
+        if hasattr(type_obj, 'kind'):
+            if type_obj.kind == BaseType.INT:
+                return "int"
+            elif type_obj.kind == BaseType.FLOAT:
+                return "float"
+            elif type_obj.kind == BaseType.BOOL:
+                return "bool"
+            elif type_obj.kind == BaseType.VOID:
+                return "void"
+            elif type_obj.kind == BaseType.STRING:
+                return "string"
+        return "int"
+
+    def get_ir_text(self, func_name: str = None) -> str:
+        """Get human-readable IR text."""
+        lines = ["# Generated IR", "#" + "=" * 50]
+
+        if func_name:
+            funcs = [(func_name, self.functions[func_name])]
+        else:
+            funcs = self.functions.items()
+
+        for name, func in funcs:
+            param_str = ', '.join([f'{p[0]}: {p[1]}' for p in func.parameters])
+            lines.append(f"\nfunction {name}: {func.return_type} ({param_str})")
+
+            sorted_blocks = sorted(func.blocks, key=lambda b: str(b.label) if b.label else "")
+            for block in sorted_blocks:
+                if block.label:
+                    lines.append(f"\n{block.label}:")
+                for instr in block.instructions:
+                    lines.append(f"    {instr}")
+
+        return "\n".join(lines)
+
+    def get_all_ir(self) -> Dict[str, IRFunction]:
+        return self.functions
+
+    def generate_array_copy(self, dest_arr: str, src_arr: str, size: Operand):
+        """Generate memcpy."""
+        dest_ptr = self.var_to_temp.get(dest_arr)
+        src_ptr = self.var_to_temp.get(src_arr)
+
+        if not dest_ptr or not src_ptr:
+            return
+
+        load_dest = IRInstruction(
+            op=OpCode.LOAD,
+            dest=self.current_function.new_temp("pointer"),
+            src1=dest_ptr
+        )
+        self.current_block.add_instruction(load_dest)
+
+        load_src = IRInstruction(
+            op=OpCode.LOAD,
+            dest=self.current_function.new_temp("pointer"),
+            src1=src_ptr
+        )
+        self.current_block.add_instruction(load_src)
+
+        bytes_count = self.current_function.new_temp("int")
+        mul = IRInstruction(
+            op=OpCode.MUL,
+            dest=bytes_count,
+            src1=size,
+            src2=Operand.literal(4, "int")
+        )
+        self.current_block.add_instruction(mul)
+
+        call_memcpy = IRInstruction(
+            op=OpCode.CALL,
+            dest=None,
+            src1=Operand.var("memcpy", "function"),
+            src2=load_dest.dest,
+            src3=load_src.dest,
+            src4=bytes_count
+        )
+        self.current_block.add_instruction(call_memcpy)﻿"""IR instruction set and operand types for three-address code."""
+
+from enum import Enum
+
+
+class OperandType(Enum):
+    """Types of operands in IR instructions."""
+    TEMP = "temp"
+    VARIABLE = "var"
+    LITERAL = "literal"
+    LABEL = "label"
+
+
+class Operand:
+    """An operand in an IR instruction."""
+
+    def __init__(self, type, value, ir_type=None):
+        self.type = type
+        self.value = value
+        self.ir_type = ir_type
+
+    def __str__(self):
+        if self.type == OperandType.TEMP:
+            return f"t{self.value}"
+        elif self.type == OperandType.VARIABLE:
+            return f"{self.value}"
+        elif self.type == OperandType.LITERAL:
+            if isinstance(self.value, bool):
+                return "true" if self.value else "false"
+            return str(self.value)
+        elif self.type == OperandType.LABEL:
+            return f"L{self.value}"
+        return f"<{self.type.value}:{self.value}>"
+
+    @staticmethod
+    def temp(idx, ir_type=None):
+        return Operand(OperandType.TEMP, idx, ir_type)
+
+    @staticmethod
+    def var(name, ir_type=None):
+        return Operand(OperandType.VARIABLE, name, ir_type)
+
+    @staticmethod
+    def literal(value, ir_type=None):
+        if isinstance(value, bool):
+            ir_type = ir_type or "bool"
+        elif isinstance(value, int):
+            ir_type = ir_type or "int"
+        elif isinstance(value, float):
+            ir_type = ir_type or "float"
+        return Operand(OperandType.LITERAL, value, ir_type)
+
+    @staticmethod
+    def label(idx):
+        return Operand(OperandType.LABEL, idx)
+
+
+class OpCode(Enum):
+    """IR instruction opcodes."""
+    ADD = "add"
+    SUB = "sub"
+    MUL = "mul"
+    DIV = "div"
+    MOD = "mod"
+    NEG = "neg"
+    AND = "and"
+    OR = "or"
+    NOT = "not"
+    XOR = "xor"
+    CMP_EQ = "cmp_eq"
+    CMP_NE = "cmp_ne"
+    CMP_LT = "cmp_lt"
+    CMP_LE = "cmp_le"
+    CMP_GT = "cmp_gt"
+    CMP_GE = "cmp_ge"
+    LOAD = "load"
+    STORE = "store"
+    ALLOCA = "alloca"
+    GEP = "gep"
+    JUMP = "jump"
+    JUMP_IF = "jump_if"
+    JUMP_IF_NOT = "jump_if_not"
+    LABEL = "label"
+    PHI = "phi"
+    CALL = "call"
+    RETURN = "return"
+    PARAM = "param"
+
+
+class IRInstruction:
+    """IR instruction."""
+
+    def __init__(self, op, dest=None, src1=None, src2=None, src3=None, label=None, comment=None):
+        self.op = op
+        self.dest = dest
+        self.src1 = src1
+        self.src2 = src2
+        self.src3 = src3
+        self.label = label
+        self.comment = comment
+
+    def __str__(self):
+        if self.op == OpCode.LABEL:
+            return f"{self.dest}:"
+        if self.op == OpCode.JUMP:
+            return f"JUMP {self.src1}"
+        if self.op == OpCode.JUMP_IF:
+            return f"JUMP_IF {self.dest}, {self.src1}"
+        if self.op == OpCode.JUMP_IF_NOT:
+            return f"JUMP_IF_NOT {self.dest}, {self.src1}"
+        if self.op == OpCode.PARAM:
+            return f"PARAM {self.dest}"
+        if self.op == OpCode.RETURN:
+            return f"RETURN {self.dest}" if self.dest else "RETURN"
+        if self.op == OpCode.CALL:
+            if self.dest:
+                return f"{self.dest} = CALL {self.src1}"
+            return f"CALL {self.src1}"
+        if self.op == OpCode.STORE:
+            return f"STORE [{self.dest}], {self.src1}"
+        if self.op == OpCode.LOAD:
+            return f"{self.dest} = LOAD [{self.src1}]"
+
+        if self.src2 is not None:
+            result = f"{self.dest} = {self.op.value.upper()} {self.src1}, {self.src2}"
+            if self.comment:
+                result += f"  # {self.comment}"
+            return result
+
+        if self.src1 is not None:
+            result = f"{self.dest} = {self.op.value.upper()} {self.src1}"
+            if self.comment:
+                result += f"  # {self.comment}"
+            return result
+
+        result = self.op.value.upper()
+        if self.comment:
+            result += f"  # {self.comment}"
+        return result
+
+
+class IRFunction:
+    """Represents a function in IR form."""
+
+    def __init__(self, name, return_type, parameters, blocks, entry_block, next_temp_id=0, next_label_id=0):
+        self.name = name
+        self.return_type = return_type
+        self.parameters = parameters
+        self.blocks = blocks
+        self.entry_block = entry_block
+        self.next_temp_id = next_temp_id
+        self.next_label_id = next_label_id
+
+    def new_temp(self, ir_type=None):
+        self.next_temp_id += 1
+        return Operand.temp(self.next_temp_id - 1, ir_type)
+
+    def new_label(self):
+        self.next_label_id += 1
+        return Operand.label(self.next_label_id - 1)"""x86-64 code generator from IR - with unique labels per function."""
+
+from typing import Dict, List, Optional
+from ..ir.ir_instructions import IRInstruction, IRFunction, OpCode, Operand, OperandType
+from ..ir.basic_block import BasicBlock
+
+
+class X86Generator:
+    def __init__(self):
+        self.current_func_name = ""
+        self.var_locations = {}
+        self.next_offset = 8
+        self.label_counter = 0
+        self.malloc_label_counter = 0
+
+    def generate(self, ir_functions: Dict[str, IRFunction]) -> str:
+        output = []
+        output.append("; Generated by MiniCompiler")
+        output.append("section .data")
+        output.append("malloc_error_msg db 'malloc failed!', 10, 0")
+        output.append("bounds_error_msg db 'array index out of bounds!', 10, 0")
+        output.append("section .text")
+        output.append("extern printf")
+        output.append("extern malloc")
+        output.append("extern free")
+        output.append("extern memcpy")
+        output.append("extern exit")
+        output.append("global main")
+        output.append("")
+
+        for name, func in ir_functions.items():
+            output.append(self._generate_function(func))
+
+        output.append("")
+        output.append("_start:")
+        output.append("    call main")
+        output.append("    mov rdi, rax")
+        output.append("    mov rax, 60")
+        output.append("    syscall")
+
+        return "\n".join(output)
+
+    def _generate_function(self, func: IRFunction) -> str:
+        self.current_func_name = func.name
+        self.var_locations = {}
+        self.next_offset = 8
+        self.label_counter = 0
+
+        self._allocate_slots(func)
+
+        lines = [f"\n{func.name}:"]
+        lines.append("    push rbp")
+        lines.append("    mov rbp, rsp")
+        if self.next_offset > 8:
+            lines.append(f"    sub rsp, {self.next_offset}")
+        lines.append("")
+
+        for block in func.blocks:
+            if block.label:
+                label_str = str(block.label).replace(':', '').replace('.', '_')
+                lines.append(f"{label_str}_{func.name}:")
+            for instr in block.instructions:
+                asm = self._generate_instruction(instr)
+                if asm:
+                    lines.append(f"    {asm}")
+
+        lines.append(f"_epilogue_{func.name}:")
+        lines.append("    mov rsp, rbp")
+        lines.append("    pop rbp")
+        lines.append("    ret")
+
+        return "\n".join(lines)
+
+    def _allocate_slots(self, func: IRFunction):
+        vars_set = set()
+        for block in func.blocks:
+            for instr in block.instructions:
+                for op in [instr.dest, instr.src1, instr.src2, instr.src3]:
+                    if op and op.type == OperandType.VARIABLE:
+                        if op.value not in ['rdi', 'rsi', 'rax', 'rbx', 'rcx', 'rdx']:
+                            vars_set.add(op.value)
+        for var in vars_set:
+            self.var_locations[var] = self.next_offset
+            self.next_offset += 8
+
+    def _generate_instruction(self, instr: IRInstruction) -> str:
+        op = instr.op
+
+        if op == OpCode.ADD:
+            return self._gen_binary(instr, "add")
+        elif op == OpCode.SUB:
+            return self._gen_binary(instr, "sub")
+        elif op == OpCode.MUL:
+            return self._gen_mul(instr)
+        elif op == OpCode.DIV:
+            return self._gen_div(instr)
+        elif op == OpCode.STORE:
+            return self._gen_store(instr)
+        elif op == OpCode.LOAD:
+            return self._gen_load(instr)
+        elif op == OpCode.JUMP:
+            return "jmp " + self._fix_label(instr.src1)
+        elif op == OpCode.JUMP_IF:
+            return self._gen_jump_if(instr)
+        elif op == OpCode.JUMP_IF_NOT:
+            return self._gen_jump_if_not(instr)
+        elif op == OpCode.RETURN:
+            return self._gen_return(instr)
+        elif op == OpCode.CALL:
+            return self._gen_call(instr)
+        elif op in [OpCode.CMP_EQ, OpCode.CMP_NE, OpCode.CMP_LT,
+                    OpCode.CMP_LE, OpCode.CMP_GT, OpCode.CMP_GE]:
+            jump_map = {
+                OpCode.CMP_EQ: "je", OpCode.CMP_NE: "jne",
+                OpCode.CMP_LT: "jl", OpCode.CMP_LE: "jle",
+                OpCode.CMP_GT: "jg", OpCode.CMP_GE: "jge",
+            }
+            return self._gen_compare(instr, jump_map[op])
+        elif op == OpCode.AND:
+            return self._gen_logical_and(instr)
+        elif op == OpCode.OR:
+            return self._gen_logical_or(instr)
+        elif op == OpCode.NOT:
+            return self._gen_logical_not(instr)
+
+        return "; TODO: " + op.value
+
+    def _fix_label(self, label):
+        label_str = str(label).replace(':', '').replace('.', '_')
+        return label_str + "_" + self.current_func_name
+
+    def _gen_binary(self, instr, asm_op):
+        src1_asm = self._to_asm(instr.src1)
+        src2_asm = self._to_asm(instr.src2)
+        lines = []
+        lines.append("mov rax, " + src1_asm)
+        lines.append(asm_op + " rax, " + src2_asm)
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            dest_asm = self._to_asm(instr.dest)
+            lines.append("mov " + dest_asm + ", rax")
+        return "\n    ".join(lines)
+
+    def _gen_mul(self, instr):
+        src1_asm = self._to_asm(instr.src1)
+        src2_asm = self._to_asm(instr.src2)
+        lines = ["mov rax, " + src1_asm, "imul rax, " + src2_asm]
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            dest_asm = self._to_asm(instr.dest)
+            lines.append("mov " + dest_asm + ", rax")
+        return "\n    ".join(lines)
+
+    def _gen_div(self, instr):
+        src1_asm = self._to_asm(instr.src1)
+        src2_asm = self._to_asm(instr.src2)
+        lines = ["mov rax, " + src1_asm, "cqo", "idiv " + src2_asm]
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            dest_asm = self._to_asm(instr.dest)
+            lines.append("mov " + dest_asm + ", rax")
+        return "\n    ".join(lines)
+
+    def _gen_store(self, instr):
+        """Store value to memory."""
+        dest_asm = self._to_asm(instr.dest)
+        src_asm = self._to_asm(instr.src1)
+
+        # If destination is a memory address (e.g., [rax] or [rbp-8])
+        if dest_asm.startswith('['):
+            # This is a store to memory through a pointer
+            return f"mov {dest_asm}, {src_asm}"
+        else:
+            # Store to register or stack variable
+            return f"mov {dest_asm}, {src_asm}"
+
+    def _gen_load(self, instr):
+        """Load value from memory."""
+        src_asm = self._to_asm(instr.src1)
+        dest_asm = self._to_asm(instr.dest)
+
+        # If source is a memory address
+        if src_asm.startswith('['):
+            return f"mov {dest_asm}, {src_asm}"
+        else:
+            # Load from register or immediate
+            return f"mov {dest_asm}, {src_asm}"
+
+    def _gen_jump_if(self, instr):
+        cond_asm = self._to_asm(instr.dest)
+        label = self._fix_label(instr.src1)
+        return "cmp " + cond_asm + ", 0\n    jne " + label
+
+    def _gen_jump_if_not(self, instr):
+        cond_asm = self._to_asm(instr.dest)
+        label = self._fix_label(instr.src1)
+        return "cmp " + cond_asm + ", 0\n    je " + label
+
+    def _gen_return(self, instr):
+        if instr.dest:
+            dest_asm = self._to_asm(instr.dest)
+            return "mov rax, " + dest_asm + "\n    jmp _epilogue_" + self.current_func_name
+        return "jmp _epilogue_" + self.current_func_name
+
+    def _gen_call(self, instr):
+        func_name = str(instr.src1)
+
+        if func_name in ["printf", "malloc", "free", "memcpy", "exit"]:
+            lines = ["; call " + func_name]
+
+            if func_name == "malloc":
+                if instr.src2:
+                    lines.append("mov rdi, " + self._to_asm(instr.src2))
+                lines.append("    xor rax, rax")
+                lines.append("    call malloc")
+                self.malloc_label_counter += 1
+                ok_label = "malloc_ok_" + str(self.malloc_label_counter)
+                lines.append("    test rax, rax")
+                lines.append("    jnz " + ok_label)
+                lines.append("    mov rdi, malloc_error_msg")
+                lines.append("    xor rax, rax")
+                lines.append("    call printf")
+                lines.append("    mov rdi, 1")
+                lines.append("    call exit")
+                lines.append(ok_label + ":")
+                if instr.dest:
+                    lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+                return "\n    ".join(lines)
+
+            elif func_name == "free":
+                if instr.src2:
+                    lines.append("mov rdi, " + self._to_asm(instr.src2))
+                lines.append("    xor rax, rax")
+                lines.append("    call free")
+                return "\n    ".join(lines)
+
+            lines.append("    xor rax, rax")
+            lines.append("    call " + func_name)
+            return "\n    ".join(lines)
+
+        lines = ["; call " + func_name]
+
+        if hasattr(instr, 'src2') and instr.src2:
+            lines.append("mov rdi, " + self._to_asm(instr.src2))
+        if hasattr(instr, 'src3') and instr.src3:
+            lines.append("mov rsi, " + self._to_asm(instr.src3))
+
+        lines.append("    xor rax, rax")
+        lines.append("    call " + func_name)
+
+        if instr.dest:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+
+        return "\n    ".join(lines)
+
+    def _gen_compare(self, instr, jump_inst):
+        self.label_counter += 1
+        true_label = self._fix_label("_cmp_true_" + str(self.label_counter))
+        end_label = self._fix_label("_cmp_end_" + str(self.label_counter))
+
+        src1_asm = self._to_asm(instr.src1)
+        src2_asm = self._to_asm(instr.src2)
+
+        lines = [
+            "mov rax, " + src1_asm,
+            "cmp rax, " + src2_asm,
+            jump_inst + " " + true_label,
+            "mov rax, 0",
+            "jmp " + end_label,
+            true_label + ":",
+            "mov rax, 1",
+            end_label + ":",
+        ]
+
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+
+        return "\n    ".join(lines)
+
+    def _gen_logical_and(self, instr):
+        self.label_counter += 1
+        false_label = self._fix_label("_land_false_" + str(self.label_counter))
+        end_label = self._fix_label("_land_end_" + str(self.label_counter))
+
+        src1_asm = self._to_asm(instr.src1)
+        src2_asm = self._to_asm(instr.src2)
+
+        lines = [
+            "mov rax, " + src1_asm,
+            "cmp rax, 1",
+            "jne " + false_label,
+            "mov rax, " + src2_asm,
+            "cmp rax, 1",
+            "jne " + false_label,
+            "mov rax, 1",
+            "jmp " + end_label,
+            false_label + ":",
+            "mov rax, 0",
+            end_label + ":",
+        ]
+
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+
+        return "\n    ".join(lines)
+
+    def _gen_logical_or(self, instr):
+        self.label_counter += 1
+        true_label = self._fix_label("_lor_true_" + str(self.label_counter))
+        end_label = self._fix_label("_lor_end_" + str(self.label_counter))
+
+        src1_asm = self._to_asm(instr.src1)
+        src2_asm = self._to_asm(instr.src2)
+
+        lines = [
+            "mov rax, " + src1_asm,
+            "cmp rax, 1",
+            "je " + true_label,
+            "mov rax, " + src2_asm,
+            "cmp rax, 1",
+            "je " + true_label,
+            "mov rax, 0",
+            "jmp " + end_label,
+            true_label + ":",
+            "mov rax, 1",
+            end_label + ":",
+        ]
+
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+
+        return "\n    ".join(lines)
+
+    def _gen_logical_not(self, instr):
+        src_asm = self._to_asm(instr.src1)
+        lines = ["mov rax, " + src_asm, "xor rax, 1"]
+        if instr.dest and instr.dest.type == OperandType.VARIABLE:
+            lines.append("mov " + self._to_asm(instr.dest) + ", rax")
+        return "\n    ".join(lines)
+
+    def _to_asm(self, op):
+        if op is None:
+            return "0"
+        if op.type == OperandType.LITERAL:
+            if isinstance(op.value, bool):
+                return "1" if op.value else "0"
+            return str(op.value)
+        elif op.type == OperandType.VARIABLE:
+            # Check if it's a register
+            if op.value in ['rdi', 'rsi', 'rax', 'rbx', 'rcx', 'rdx']:
+                return op.value
+            offset = self.var_locations.get(op.value, 8)
+            return "[rbp-" + str(offset) + "]"
+        elif op.type == OperandType.TEMP:
+            return "rax"
+        elif op.type == OperandType.LABEL:
+            return self._fix_label(op)
+        return "0"

@@ -1,0 +1,15 @@
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+from src.semantic.analyzer import SemanticAnalyzer
+from src.ir.ir_generator import IRGenerator
+
+source = 'int main() { int arr[5] = {1,2,3,4,5}; return arr[2]; }'
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+analyzer = SemanticAnalyzer()
+analyzer.analyze(ast)
+ir_gen = IRGenerator(analyzer.get_symbol_table())
+ir_funcs = ir_gen.generate(ast)
+print(ir_gen.get_ir_text())

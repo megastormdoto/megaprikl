@@ -1,0 +1,78 @@
+#!/bin/bash
+# MiniCompiler - правильная компиляция
+
+if [ "$1" = "--version" ]; then
+    echo "mycc 1.0.0"
+    exit 0
+fi
+
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: mycc <sourcefile> -o <output>"
+    exit 0
+fi
+
+SOURCE=""
+OUTPUT=""
+
+# Парсим аргументы
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -o)
+            OUTPUT="$2"
+            shift 2
+            ;;
+        *)
+            SOURCE="$1"
+            shift
+            ;;
+    esac
+done
+
+if [ -z "$SOURCE" ]; then
+    echo "Error: No source file"
+    exit 1
+fi
+
+if [ -z "$OUTPUT" ]; then
+    OUTPUT="${SOURCE%.*}"
+fi
+
+# Компиляция через Python
+python3 -c "
+from src.lexer.scanner import Scanner
+from src.parser.parser import Parser
+from src.semantic.analyzer import SemanticAnalyzer
+from src.ir.ir_generator import IRGenerator
+from src.codegen.x86_generator import X86Generator
+import sys
+
+with open('$SOURCE', 'r') as f:
+    source = f.read()
+
+scanner = Scanner(source)
+tokens = scanner.scan_tokens()
+parser = Parser(tokens)
+ast = parser.parse()
+
+if parser.errors:
+    for err in parser.errors:
+        print(err)
+    sys.exit(1)
+
+analyzer = SemanticAnalyzer()
+analyzer.analyze(ast)
+
+ir_gen = IRGenerator(analyzer.get_symbol_table())
+ir_funcs = ir_gen.generate(ast)
+x86_gen = X86Generator()
+asm = x86_gen.generate(ir_funcs)
+
+with open('$OUTPUT.asm', 'w') as f:
+    f.write(asm)
+
+# Сборка
+import subprocess
+subprocess.run(['nasm', '-f', 'elf64', '$OUTPUT.asm', '-o', '$OUTPUT.o'])
+subprocess.run(['gcc', '-no-pie', '$OUTPUT.o', '-o', '$OUTPUT'])
+print(f'Compiled: $OUTPUT')
+" && ./"$OUTPUT"

@@ -6,7 +6,7 @@ from src.parser.ast import (
     BlockNode, IfStmtNode, WhileStmtNode, ForStmtNode, ReturnStmtNode,
     AssignmentNode, BinaryExprNode, UnaryExprNode, CallNode,
     IdentifierNode, LiteralNode, ExprStmtNode, ParameterNode,
-    ASTNode
+    ArrayDeclNode, ArrayAccessNode, ASTNode
 )
 from src.semantic.symbol_table import SymbolTable, Symbol, SymbolKind
 from src.semantic.type_system import Type, BaseType, TypeSystem
@@ -55,6 +55,8 @@ class SemanticAnalyzer:
                 self.visit_function_decl(decl)
             elif isinstance(decl, VarDeclNode):
                 self.visit_var_decl(decl)
+            elif isinstance(decl, ArrayDeclNode):
+                self.visit_array_decl(decl)
 
     def _declare_function(self, node: FunctionDeclNode):
         """Объявляет функцию."""
@@ -96,14 +98,14 @@ class SemanticAnalyzer:
             return
 
         fields = {}
-        for field_name, field_type in node.fields.items():
-            if field_name in fields:
+        for field in node.fields:
+            if field.name in fields:
                 self.errors.add(
                     node.line, node.column,
-                    f"duplicate field '{field_name}'",
+                    f"duplicate field '{field.name}'",
                     "duplicate_declaration"
                 )
-            fields[field_name] = self._convert_type(field_type)
+            fields[field.name] = self._convert_type(field.var_type)
 
         struct_type = Type(kind=node.name, is_struct=True, fields=fields)
         struct_sym = Symbol(
@@ -171,6 +173,8 @@ class SemanticAnalyzer:
         """Обрабатывает операторы."""
         if isinstance(node, VarDeclNode):
             self.visit_var_decl(node)
+        elif isinstance(node, ArrayDeclNode):
+            self.visit_array_decl(node)
         elif isinstance(node, AssignmentNode):
             self.visit_assignment(node)
         elif isinstance(node, IfStmtNode):
@@ -188,6 +192,78 @@ class SemanticAnalyzer:
         elif isinstance(node, ExprStmtNode):
             if node.expression:
                 self.visit_expression(node.expression)
+
+    def visit_array_decl(self, node: ArrayDeclNode):
+        """Проверяет объявление массива."""
+        size_type = self.visit_expression(node.size)
+
+        # Размер должен быть int
+        if size_type.kind != BaseType.INT:
+            self.errors.add_type_mismatch(
+                node.line, node.column,
+                f"array size must be integer",
+                expected="int",
+                actual=str(size_type)
+            )
+
+        element_type = self._convert_type(node.element_type)
+        array_type = Type(
+            kind=BaseType.INT,
+            is_array=True,
+            array_size=None,
+            element_type=element_type
+        )
+
+        if self.symbol_table.lookup_local(node.name):
+            self.errors.add(
+                node.line, node.column,
+                f"duplicate variable: '{node.name}'",
+                "duplicate_declaration"
+            )
+            return
+
+        var_sym = Symbol(
+            name=node.name,
+            kind=SymbolKind.VARIABLE,
+            type=array_type,
+            line=node.line,
+            column=node.column
+        )
+        self.symbol_table.insert(node.name, var_sym)
+        node.semantic_type = array_type
+        node.symbol = var_sym
+
+    def visit_array_access(self, node: ArrayAccessNode) -> Type:
+        """Проверяет доступ к элементу массива."""
+        array_sym = self.symbol_table.lookup(node.array)
+        if not array_sym:
+            self.errors.add_undeclared(node.line, node.column, node.array)
+            node.semantic_type = Type(BaseType.VOID)
+            return node.semantic_type
+
+        # Проверяем, что это массив
+        if not hasattr(array_sym.type, 'is_array') or not array_sym.type.is_array:
+            self.errors.add(
+                node.line, node.column,
+                f"'{node.array}' is not an array",
+                "type_error"
+            )
+            node.semantic_type = Type(BaseType.VOID)
+            return node.semantic_type
+
+        # Проверяем тип индекса
+        index_type = self.visit_expression(node.index)
+        if index_type.kind != BaseType.INT:
+            self.errors.add_type_mismatch(
+                node.index.line, node.index.column,
+                f"array index must be integer",
+                expected="int",
+                actual=str(index_type)
+            )
+
+        node.semantic_type = array_sym.type.element_type or Type(BaseType.INT)
+        node.array_symbol = array_sym
+        return node.semantic_type
 
     def visit_var_decl(self, node: VarDeclNode):
         """Проверяет объявление переменной."""
@@ -224,27 +300,30 @@ class SemanticAnalyzer:
 
     def visit_assignment(self, node: AssignmentNode):
         """Проверяет присваивание."""
-        if isinstance(node.left, IdentifierNode):
-            var_sym = self.symbol_table.lookup(node.left.name)
+        # Поддержка присваивания элементам массива
+        if isinstance(node.target, ArrayAccessNode):
+            target_type = self.visit_array_access(node.target)
+        elif isinstance(node.target, IdentifierNode):
+            var_sym = self.symbol_table.lookup(node.target.name)
             if not var_sym:
-                self.errors.add_undeclared(node.left.line, node.left.column, node.left.name)
+                self.errors.add_undeclared(node.target.line, node.target.column, node.target.name)
                 return
-            left_type = var_sym.type
-            node.left.symbol = var_sym
+            target_type = var_sym.type
+            node.target.symbol = var_sym
         else:
-            left_type = self.visit_expression(node.left)
+            target_type = self.visit_expression(node.target)
 
-        right_type = self.visit_expression(node.right)
+        right_type = self.visit_expression(node.value)
 
-        if not TypeSystem.is_compatible(left_type, right_type):
+        if not TypeSystem.is_compatible(target_type, right_type):
             self.errors.add_type_mismatch(
                 node.line, node.column,
                 "type mismatch in assignment",
-                expected=str(left_type),
+                expected=str(target_type),
                 actual=str(right_type)
             )
 
-        node.semantic_type = left_type
+        node.semantic_type = target_type
 
     def visit_expression(self, node):
         """Определяет тип выражения."""
@@ -258,6 +337,8 @@ class SemanticAnalyzer:
             return self.visit_unary_op(node)
         elif isinstance(node, CallNode):
             return self.visit_call(node)
+        elif isinstance(node, ArrayAccessNode):
+            return self.visit_array_access(node)
         return Type(BaseType.VOID)
 
     def visit_literal(self, node: LiteralNode) -> Type:
@@ -402,8 +483,8 @@ class SemanticAnalyzer:
 
     def visit_for(self, node: ForStmtNode):
         """Проверяет for."""
-        if node.initializer:
-            self.visit_statement(node.initializer)
+        if node.init:
+            self.visit_statement(node.init)
         if node.condition:
             cond_type = self.visit_expression(node.condition)
             if cond_type.kind != BaseType.BOOL:
@@ -413,8 +494,8 @@ class SemanticAnalyzer:
                     expected="bool",
                     actual=str(cond_type)
                 )
-        if node.increment:
-            self.visit_expression(node.increment)
+        if node.update:
+            self.visit_expression(node.update)
 
         old_in_loop = self.in_loop
         self.in_loop = True

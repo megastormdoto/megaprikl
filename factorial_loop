@@ -1,0 +1,47 @@
+Program [1:1]:
+  FunctionDecl: factorial -> int [1:1]
+    Parameters:
+      Param: int n [1:15]
+    Body:
+      Block [1:22]:
+        VarDecl: int result = ... [2:5]
+          Literal: 1 (int) [2:18]
+        VarDecl: int i = ... [3:5]
+          Literal: 1 (int) [3:13]
+        WhileStmt [4:5]:
+          Condition:
+            Binary: <= [4:12]
+              Left:
+                Identifier: i [4:12]
+              Right:
+                Identifier: n [4:17]
+          Body:
+            Block [4:20]:
+              ExprStmt [5:9]:
+                Assignment: result = [5:9]
+                  Binary: * [5:18]
+                    Left:
+                      Identifier: result [5:18]
+                    Right:
+                      Identifier: i [5:27]
+              ExprStmt [6:9]:
+                Assignment: i = [6:9]
+                  Binary: + [6:13]
+                    Left:
+                      Identifier: i [6:13]
+                    Right:
+                      Literal: 1 (int) [6:17]
+        Return [8:5]:
+          Identifier: result [8:12]
+  FunctionDecl: main -> int [11:1]
+    Parameters:
+    Body:
+      Block [11:12]:
+        VarDecl: int n = ... [12:5]
+          Literal: 5 (int) [12:13]
+        VarDecl: int res = ... [13:5]
+          Call: factorial [13:15]
+            Arguments:
+              Identifier: n [13:25]
+        Return [14:5]:
+          Identifier: res [14:12]
